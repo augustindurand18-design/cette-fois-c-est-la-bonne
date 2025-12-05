@@ -1,0 +1,11 @@
+{
+    "name": "Smart Offer Widget",
+    "settings": {
+        "btn_color": {
+            "label": "Button Color"
+        },
+        "btn_text": {
+            "label": "Button Text"
+        }
+    }
+}

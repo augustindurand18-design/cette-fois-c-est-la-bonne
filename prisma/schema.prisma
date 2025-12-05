@@ -5,9 +5,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
   provider = "sqlite"
   url      = "file:dev.sqlite"
@@ -29,4 +26,36 @@ model Session {
   locale        String?
   collaborator  Boolean?  @default(false)
   emailVerified Boolean?  @default(false)
+}
+
+model Shop {
+  id          String   @id
+  shopUrl     String   @unique
+  accessToken String?  // Optional because sometimes we might just want to track the shop
+  isActive    Boolean  @default(false)
+  rules       Rule[]
+  offers      Offer[]
+  createdAt   DateTime @default(now())
+}
+
+model Rule {
+  id             String   @id @default(uuid())
+  shopId         String
+  shop           Shop     @relation(fields: [shopId], references: [id])
+  collectionId   String?  // If null, it's a global rule
+  productId      String?  // If defined, overrides collection/global
+  minDiscount    Float    // e.g., 0.80 for 20% off max
+  isEnabled      Boolean  @default(true)
+  createdAt      DateTime @default(now())
+}
+
+model Offer {
+  id            String   @id @default(uuid())
+  shopId        String
+  shop          Shop     @relation(fields: [shopId], references: [id])
+  customerEmail String?
+  offeredPrice  Float
+  status        String   // ACCEPTED, REJECTED, COUNTER_OFFER
+  code          String?  // Generated discount code if accepted
+  createdAt     DateTime @default(now())
 }

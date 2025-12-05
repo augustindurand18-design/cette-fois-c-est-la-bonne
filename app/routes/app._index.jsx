@@ -1,243 +1,188 @@
-import { useEffect } from "react";
-import { useFetcher } from "react-router";
-import { useAppBridge } from "@shopify/app-bridge-react";
-import { boundary } from "@shopify/shopify-app-react-router/server";
+import { useEffect, useState } from "react";
+import { useFetcher, useLoaderData } from "react-router";
+import {
+  Page,
+  Layout,
+  Card,
+  RangeSlider,
+  Text,
+  BlockStack,
+  Box,
+  Banner,
+} from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
+import db from "../db.server";
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
+  const shopUrl = session.shop;
 
-  return null;
-};
+  // 1. Get Shop & Stats
+  const shop = await db.shop.findUnique({
+    where: { shopUrl },
+    include: {
+      offers: true,
+      rules: true,
+    },
+  });
 
-export const action = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
-  const color = ["Red", "Orange", "Yellow", "Green"][
-    Math.floor(Math.random() * 4)
-  ];
-  const response = await admin.graphql(
-    `#graphql
-      mutation populateProduct($product: ProductCreateInput!) {
-        productCreate(product: $product) {
-          product {
-            id
-            title
-            handle
-            status
-            variants(first: 10) {
-              edges {
-                node {
-                  id
-                  price
-                  barcode
-                  createdAt
-                }
-              }
-            }
-          }
-        }
-      }`,
-    {
-      variables: {
-        product: {
-          title: `${color} Snowboard`,
-        },
-      },
-    },
-  );
-  const responseJson = await response.json();
-  const product = responseJson.data.productCreate.product;
-  const variantId = product.variants.edges[0].node.id;
-  const variantResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyReactRouterTemplateUpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants {
-          id
-          price
-          barcode
-          createdAt
-        }
-      }
-    }`,
-    {
-      variables: {
-        productId: product.id,
-        variants: [{ id: variantId, price: "100.00" }],
-      },
-    },
-  );
-  const variantResponseJson = await variantResponse.json();
+  if (!shop) {
+    return {
+      minDiscount: 0.8,
+      stats: { total: 0, accepted: 0, rejected: 0 }
+    };
+  }
+
+  // Calculate Stats
+  const total = shop.offers.length;
+  const accepted = shop.offers.filter((o) => o.status === "ACCEPTED").length;
+  const rejected = shop.offers.filter((o) => o.status === "REJECTED").length;
+
+  // Get Global Rule
+  const globalRule = shop.rules.find((r) => !r.collectionId && !r.productId);
+  const minDiscount = globalRule ? globalRule.minDiscount : 0.8;
 
   return {
-    product: responseJson.data.productCreate.product,
-    variant: variantResponseJson.data.productVariantsBulkUpdate.productVariants,
+    minDiscount,
+    stats: { total, accepted, rejected },
   };
 };
 
+export const action = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
+  const shopUrl = session.shop;
+  const formData = await request.formData();
+  const minDiscount = parseFloat(formData.get("minDiscount"));
+
+  // Upsert Shop & Rule
+  let shop = await db.shop.findUnique({ where: { shopUrl } });
+  if (!shop) {
+    shop = await db.shop.create({
+      data: {
+        id: session.id,
+        shopUrl,
+        accessToken: session.accessToken,
+        isActive: true,
+      },
+    });
+  }
+
+  const existingRule = await db.rule.findFirst({
+    where: { shopId: shop.id, collectionId: null, productId: null },
+  });
+
+  if (existingRule) {
+    await db.rule.update({
+      where: { id: existingRule.id },
+      data: { minDiscount },
+    });
+  } else {
+    await db.rule.create({
+      data: {
+        shopId: shop.id,
+        minDiscount,
+      },
+    });
+  }
+
+  return { success: true };
+};
+
 export default function Index() {
+  const { minDiscount, stats } = useLoaderData();
   const fetcher = useFetcher();
-  const shopify = useAppBridge();
-  const isLoading =
-    ["loading", "submitting"].includes(fetcher.state) &&
-    fetcher.formMethod === "POST";
+
+  // Transform 0.8 -> 20 (%)
+  const [discountValue, setDiscountValue] = useState(Math.round((1 - minDiscount) * 100));
+
+  const handleSliderChange = (value) => {
+    setDiscountValue(value);
+  };
+
+  const handleSave = () => {
+    // Transform 20 -> 0.8
+    const newMinDiscount = 1 - (discountValue / 100);
+    fetcher.submit(
+      { minDiscount: newMinDiscount.toString() },
+      { method: "POST" }
+    );
+  };
 
   useEffect(() => {
-    if (fetcher.data?.product?.id) {
-      shopify.toast.show("Product created");
+    if (fetcher.data?.success) {
+      // shopify.toast.show("Règles mises à jour !"); 
+      // Note: access to shopify object might need useAppBridge() hook if not global
+      // but standard template has standard Toast logic.
+      // If we need Toast: const shopify = useAppBridge(); 
+      // I'll skip toast call if shopify is not defined to avoid breakage, or assuming global shopify object 
+      // from legacy app bridge. Modern App Bridge makes 'shopify' global? No.
+      // I will assume simple functionality for now.
     }
-  }, [fetcher.data?.product?.id, shopify]);
-  const generateProduct = () => fetcher.submit({}, { method: "POST" });
+  }, [fetcher.data]);
 
   return (
-    <s-page heading="Shopify app template">
-      <s-button slot="primary-action" onClick={generateProduct}>
-        Generate a product
-      </s-button>
+    <Page title="SmartOffer Dashboard">
+      <Layout>
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="500">
+              <Text as="h2" variant="headingMd">Règles de Négociation</Text>
+              <Box padding="200">
+                <Text>Rabais Maximum Autorisé: {discountValue}%</Text>
+                <RangeSlider
+                  output
+                  label="Définissez le pourcentage maximum de réduction que le bot peut accepter."
+                  min={0}
+                  max={50}
+                  step={1}
+                  value={discountValue}
+                  onChange={handleSliderChange}
+                  suffix={`${discountValue}%`}
+                />
+              </Box>
+              <Box>
+                <Banner title="Note" tone="info">
+                  Le bot acceptera toute offre supérieure ou égale à {100 - discountValue}% du prix original.
+                </Banner>
+              </Box>
+              <Box pb="400">
+                <button
+                  onClick={handleSave}
+                  style={{
+                    backgroundColor: '#008060',
+                    color: 'white',
+                    padding: '10px 20px',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {fetcher.state !== "idle" ? "Enregistrement..." : "Enregistrer"}
+                </button>
+              </Box>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
 
-      <s-section heading="Congrats on creating a new Shopify app 🎉">
-        <s-paragraph>
-          This embedded app template uses{" "}
-          <s-link
-            href="https://shopify.dev/docs/apps/tools/app-bridge"
-            target="_blank"
-          >
-            App Bridge
-          </s-link>{" "}
-          interface examples like an{" "}
-          <s-link href="/app/additional">additional page in the app nav</s-link>
-          , as well as an{" "}
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql"
-            target="_blank"
-          >
-            Admin GraphQL
-          </s-link>{" "}
-          mutation demo, to provide a starting point for app development.
-        </s-paragraph>
-      </s-section>
-      <s-section heading="Get started with products">
-        <s-paragraph>
-          Generate a product with GraphQL and get the JSON output for that
-          product. Learn more about the{" "}
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql/latest/mutations/productCreate"
-            target="_blank"
-          >
-            productCreate
-          </s-link>{" "}
-          mutation in our API references.
-        </s-paragraph>
-        <s-stack direction="inline" gap="base">
-          <s-button
-            onClick={generateProduct}
-            {...(isLoading ? { loading: true } : {})}
-          >
-            Generate a product
-          </s-button>
-          {fetcher.data?.product && (
-            <s-button
-              onClick={() => {
-                shopify.intents.invoke?.("edit:shopify/Product", {
-                  value: fetcher.data?.product?.id,
-                });
-              }}
-              target="_blank"
-              variant="tertiary"
-            >
-              Edit product
-            </s-button>
-          )}
-        </s-stack>
-        {fetcher.data?.product && (
-          <s-section heading="productCreate mutation">
-            <s-stack direction="block" gap="base">
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre style={{ margin: 0 }}>
-                  <code>{JSON.stringify(fetcher.data.product, null, 2)}</code>
-                </pre>
-              </s-box>
-
-              <s-heading>productVariantsBulkUpdate mutation</s-heading>
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre style={{ margin: 0 }}>
-                  <code>{JSON.stringify(fetcher.data.variant, null, 2)}</code>
-                </pre>
-              </s-box>
-            </s-stack>
-          </s-section>
-        )}
-      </s-section>
-
-      <s-section slot="aside" heading="App template specs">
-        <s-paragraph>
-          <s-text>Framework: </s-text>
-          <s-link href="https://reactrouter.com/" target="_blank">
-            React Router
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Interface: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/api/app-home/using-polaris-components"
-            target="_blank"
-          >
-            Polaris web components
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>API: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql"
-            target="_blank"
-          >
-            GraphQL
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Database: </s-text>
-          <s-link href="https://www.prisma.io/" target="_blank">
-            Prisma
-          </s-link>
-        </s-paragraph>
-      </s-section>
-
-      <s-section slot="aside" heading="Next steps">
-        <s-unordered-list>
-          <s-list-item>
-            Build an{" "}
-            <s-link
-              href="https://shopify.dev/docs/apps/getting-started/build-app-example"
-              target="_blank"
-            >
-              example app
-            </s-link>
-          </s-list-item>
-          <s-list-item>
-            Explore Shopify&apos;s API with{" "}
-            <s-link
-              href="https://shopify.dev/docs/apps/tools/graphiql-admin-api"
-              target="_blank"
-            >
-              GraphiQL
-            </s-link>
-          </s-list-item>
-        </s-unordered-list>
-      </s-section>
-    </s-page>
+        <Layout.Section variant="oneThird">
+          <Card>
+            <BlockStack gap="200">
+              <Text as="h2" variant="headingMd">Statistiques</Text>
+              <BlockStack>
+                <Text variant="bodyMd" as="p">Offres Reçues: <b>{stats.total}</b></Text>
+                <Text variant="bodyMd" as="p" color="success">Acceptées: <b>{stats.accepted}</b></Text>
+                <Text variant="bodyMd" as="p" color="critical">Refusées: <b>{stats.rejected}</b></Text>
+              </BlockStack>
+            </BlockStack>
+          </Card>
+          <Box pt="400">
+            <Card>
+              <Text variant="headingSm" as="h3">App Embed</Text>
+              <Text>Assurez-vous d'activer l'extension dans votre thème.</Text>
+            </Card>
+          </Box>
+        </Layout.Section>
+      </Layout>
+    </Page>
   );
 }
-
-export const headers = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};

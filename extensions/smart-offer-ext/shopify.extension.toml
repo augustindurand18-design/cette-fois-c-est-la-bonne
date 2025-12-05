@@ -1,0 +1,12 @@
+api_version = "2024-10"
+
+[[extensions]]
+name = "Smart Offer Widget"
+handle = "smart-offer-widget"
+
+uid = "2f07df02-690c-744c-4e0b-921c32c799a0dc8b3f9e"
+
+type = "theme_app_extension"
+
+  [[extensions.targeting]]
+  target = "section"

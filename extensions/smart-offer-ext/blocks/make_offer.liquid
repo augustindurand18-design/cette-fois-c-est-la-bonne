@@ -1,0 +1,39 @@
+{% schema %}
+{
+  "name": "Smart Offer Button",
+  "target": "section",
+  "stylesheet": "offer.css",
+  "javascript": "offer.js",
+  "settings": [
+    { "type": "color", "id": "btn_color", "label": "Couleur du bouton", "default": "#000000" },
+    { "type": "text", "id": "btn_text", "label": "Texte du bouton", "default": "Faire une offre" }
+  ]
+}
+{% endschema %}
+
+<div class="smart-offer-container" style="margin: 20px 0;">
+  <button id="smart-offer-trigger" style="background-color: {{ block.settings.btn_color }}; color: white; padding: 10px 20px; border: none; cursor: pointer; width: 100%;">
+    {{ block.settings.btn_text }}
+  </button>
+
+  <div id="smart-offer-modal" class="smart-offer-modal" style="display: none;">
+    <div class="smart-offer-modal-content">
+      <span class="smart-offer-close">&times;</span>
+      <h3>Négocier le prix</h3>
+      <div id="smart-offer-step-1">
+          <p>Quel est votre meilleur prix ?</p>
+          <input type="number" id="smart-offer-input" placeholder="Prix (€)" />
+          <button id="smart-offer-submit">Envoyer l'offre</button>
+      </div>
+      <div id="smart-offer-feedback"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.smartOfferConfig = {
+    productId: "{{ product.id }}",
+    variantId: "{{ product.selected_or_first_available_variant.id }}",
+    shopUrl: "{{ shop.permanent_domain }}"
+  };
+</script>

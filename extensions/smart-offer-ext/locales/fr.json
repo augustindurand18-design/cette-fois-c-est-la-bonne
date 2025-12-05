@@ -1,0 +1,11 @@
+{
+    "name": "Widget Offre Intelligente",
+    "settings": {
+        "btn_color": {
+            "label": "Couleur du bouton"
+        },
+        "btn_text": {
+            "label": "Texte du bouton"
+        }
+    }
+}
