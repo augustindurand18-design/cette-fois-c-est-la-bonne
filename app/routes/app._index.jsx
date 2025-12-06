@@ -307,13 +307,123 @@ export default function Index() {
               />
 
               <FormLayout>
-                <TextField
-                  label="Couleur du Widget (Hex)"
-                  value={color}
-                  onChange={setColor}
-                  autoComplete="off"
-                  prefix={<div style={{ width: 20, height: 20, background: color, borderRadius: 4, border: '1px solid #ccc' }}></div>}
-                />
+                <Text variant="headingSm" as="h6">Couleur du Widget</Text>
+                <div style={{ display: "flex", alignItems: "end", gap: "10px", marginBottom: "1rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px" }}>
+                    <div
+                      style={{
+                        width: "50px",
+                        height: "50px",
+                        borderRadius: "8px",
+                        backgroundColor: color,
+                        border: "2px solid #ddd",
+                        cursor: "pointer",
+                        boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}
+                      onClick={() => document.getElementById("native-color-picker").click()}
+                      title="Cliquer pour changer la couleur"
+                    >
+                      <span style={{ fontSize: "20px", filter: "drop-shadow(0 0 2px rgba(255,255,255,0.8))" }}>🎨</span>
+                    </div>
+                    <Text variant="bodyXs" tone="subdued">Cliquer</Text>
+                  </div>
+
+                  <input
+                    type="color"
+                    id="native-color-picker"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    style={{ visibility: "hidden", position: "absolute", width: 0, height: 0 }}
+                  />
+                  <div style={{ flexGrow: 1 }}>
+                    <TextField
+                      label="Code Hex"
+                      value={color}
+                      onChange={setColor}
+                      autoComplete="off"
+                      placeholder="#000000"
+                      helpText="Ou entrez le code couleur manuellement."
+                    />
+                  </div>
+                </div>
+
+                {/* Preview Box */}
+                <Box paddingBlockEnd="400">
+                  <Text variant="headingSm" as="h6">Aperçu du Chat</Text>
+                  <div style={{
+                    border: "1px solid #e1e3e5",
+                    borderRadius: "12px",
+                    overflow: "hidden",
+                    maxWidth: "350px",
+                    margin: "10px 0",
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif'
+                  }}>
+                    {/* Header */}
+                    <div style={{
+                      backgroundColor: color,
+                      color: "#fff",
+                      padding: "12px 16px",
+                      fontWeight: "600",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center"
+                    }}>
+                      <span>Négociation en direct</span>
+                      <span>✕</span>
+                    </div>
+                    {/* Body */}
+                    <div style={{
+                      backgroundColor: "#fff",
+                      padding: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "12px",
+                      minHeight: "150px"
+                    }}>
+                      {/* Bot Msg */}
+                      <div style={{
+                        alignSelf: "flex-start",
+                        backgroundColor: "#f1f1f1",
+                        color: "#000",
+                        padding: "10px 14px",
+                        borderRadius: "18px 18px 18px 4px",
+                        maxWidth: "85%",
+                        fontSize: "14px",
+                        lineHeight: "1.4"
+                      }}>
+                        {welcomeMsg || "Bonjour ! 👋"}
+                      </div>
+                      {/* User Msg */}
+                      <div style={{
+                        alignSelf: "flex-end",
+                        backgroundColor: "#007AFF",
+                        color: "#fff",
+                        padding: "10px 14px",
+                        borderRadius: "18px 18px 4px 18px",
+                        maxWidth: "85%",
+                        fontSize: "14px"
+                      }}>
+                        85 €
+                      </div>
+                      {/* Bot Logic */}
+                      <div style={{
+                        alignSelf: "flex-start",
+                        backgroundColor: "#f1f1f1",
+                        color: "#000",
+                        padding: "10px 14px",
+                        borderRadius: "18px 18px 18px 4px",
+                        maxWidth: "85%",
+                        fontSize: "14px",
+                        lineHeight: "1.4"
+                      }}>
+                        {rejectMsg ? rejectMsg.replace("{price}", "90.00") : "Je peux faire 90.00 €."}
+                      </div>
+                    </div>
+                  </div>
+                </Box>
 
                 <TextField
                   label="Message de Bienvenue"

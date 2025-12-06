@@ -24,8 +24,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (data.widgetColor) appSettings.widgetColor = data.widgetColor;
 
                 // Apply Styles
-                btn.style.setProperty("background-color", appSettings.widgetColor, "important");
-                btn.style.border = "none"; // Remove border if conflict
+                // btn.style.setProperty("background-color", appSettings.widgetColor, "important");
+                // btn.style.border = "none"; 
+
 
                 const header = document.querySelector(".smart-offer-header");
                 if (header) header.style.backgroundColor = appSettings.widgetColor;
@@ -42,11 +43,33 @@ document.addEventListener('DOMContentLoaded', function () {
     let isThinking = false;
     let attemptCount = 0;
 
-    // ... (Helpers: Scroll, AddMessage, AddLoading, RemoveLoading) ...
-    // Note: I need to preserve helpers, but 'Instruction' replaces block. 
-    // I will use START/END lines carefully to insert after 'if (!btn) return;' and before 'btn.onclick'.
+    // Helpers
+    const scrollToBottom = () => {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    };
 
-    // Actually, I'll modify the btn.onclick block to use appSettings instead of hardcoded string.
+    const addMessage = (text, sender, isHtml = false) => {
+        const msgDiv = document.createElement("div");
+        msgDiv.classList.add("smart-offer-message", sender);
+        if (isHtml) msgDiv.innerHTML = text;
+        else msgDiv.innerText = text;
+        messagesContainer.appendChild(msgDiv);
+        scrollToBottom();
+    };
+
+    const addLoading = () => {
+        const loader = document.createElement("div");
+        loader.className = "smart-offer-loading";
+        loader.innerHTML = "<span>.</span><span>.</span><span>.</span>";
+        loader.id = "smart-offer-loading-indicator";
+        messagesContainer.appendChild(loader);
+        scrollToBottom();
+    };
+
+    const removeLoading = () => {
+        const loader = document.getElementById("smart-offer-loading-indicator");
+        if (loader) loader.remove();
+    };
 
     // Open/Close
     btn.onclick = function () {

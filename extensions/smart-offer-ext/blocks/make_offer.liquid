@@ -6,13 +6,17 @@
   "javascript": "offer.js",
   "settings": [
     { "type": "text", "id": "btn_text", "label": "Texte du bouton", "default": "Faire une offre" },
-    { "type": "range", "id": "btn_height", "min": 30, "max": 100, "step": 1, "unit": "px", "label": "Hauteur", "default": 44 }
+    { "type": "range", "id": "btn_height", "min": 30, "max": 100, "step": 1, "unit": "px", "label": "Hauteur", "default": 44 },
+    { "type": "color", "id": "btn_color", "label": "Couleur du bouton", "default": "#000000" },
+    { "type": "color", "id": "btn_text_color", "label": "Couleur du texte", "default": "#ffffff" },
+    { "type": "range", "id": "btn_border_radius", "min": 0, "max": 40, "step": 1, "unit": "px", "label": "Arrondi des bords", "default": 4 },
+    { "type": "range", "id": "btn_font_size", "min": 12, "max": 24, "step": 1, "unit": "px", "label": "Taille du texte", "default": 16 }
   ]
 }
 {% endschema %}
 
 <div class="smart-offer-container product-form__buttons">
-  <button id="smart-offer-trigger" class="button button--secondary product-form__submit" style="width: 100%; min-height: {{ block.settings.btn_height }}px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+  <button id="smart-offer-trigger" class="button button--secondary product-form__submit" style="background-color: {{ block.settings.btn_color }}; color: {{ block.settings.btn_text_color }}; border-radius: {{ block.settings.btn_border_radius }}px; font-size: {{ block.settings.btn_font_size }}px; width: 100%; min-height: {{ block.settings.btn_height }}px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
     {{ block.settings.btn_text }}
   </button>
 
