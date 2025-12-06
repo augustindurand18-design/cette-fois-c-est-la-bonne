@@ -37,8 +37,13 @@ export async function action({ request }) {
         const minDiscountMultiplier = rule ? rule.minDiscount : 0.8;
 
         // 3. Logic
-        // Mock Original Price (Critical MVP Limitation)
-        const originalPrice = 100.00;
+        // 3. Logic
+        // Fetch Real Price from Shopify
+        const price = await getProductPrice(shop.shopUrl, shop.accessToken, productId);
+        if (!price) {
+            return { status: "ERROR", error: "Could not fetch product price" };
+        }
+        const originalPrice = parseFloat(price);
 
         const minAcceptedPrice = originalPrice * minDiscountMultiplier;
         const offerValue = parseFloat(offerPrice);
@@ -191,6 +196,41 @@ async function createShopifyDiscount(shopDomain, accessToken, code, amount, prod
         return code;
     } catch (e) {
         console.error("Network or parsing error", e);
+        return null;
+    }
+}
+
+async function getProductPrice(shopDomain, accessToken, productId) {
+    const query = `
+      query getProduct($id: ID!) {
+        product(id: $id) {
+          priceRangeV2 {
+            minVariantPrice {
+              amount
+            }
+          }
+        }
+      }
+    `;
+
+    const variables = {
+        id: `gid://shopify/Product/${productId}`
+    };
+
+    try {
+        const response = await fetch(`https://${shopDomain}/admin/api/2024-10/graphql.json`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Shopify-Access-Token': accessToken
+            },
+            body: JSON.stringify({ query, variables })
+        });
+
+        const json = await response.json();
+        return json.data?.product?.priceRangeV2?.minVariantPrice?.amount;
+    } catch (e) {
+        console.error("Error fetching price", e);
         return null;
     }
 }

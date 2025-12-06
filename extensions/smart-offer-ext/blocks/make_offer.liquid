@@ -5,14 +5,14 @@
   "stylesheet": "offer.css",
   "javascript": "offer.js",
   "settings": [
-    { "type": "color", "id": "btn_color", "label": "Couleur du bouton", "default": "#000000" },
-    { "type": "text", "id": "btn_text", "label": "Texte du bouton", "default": "Faire une offre" }
+    { "type": "text", "id": "btn_text", "label": "Texte du bouton", "default": "Faire une offre" },
+    { "type": "range", "id": "btn_height", "min": 30, "max": 100, "step": 1, "unit": "px", "label": "Hauteur", "default": 44 }
   ]
 }
 {% endschema %}
 
-<div class="smart-offer-container" style="margin: 20px 0;">
-  <button id="smart-offer-trigger" style="background-color: {{ block.settings.btn_color }}; color: white; padding: 10px 20px; border: none; cursor: pointer; width: 100%;">
+<div class="smart-offer-container product-form__buttons">
+  <button id="smart-offer-trigger" class="button button--secondary product-form__submit" style="width: 100%; min-height: {{ block.settings.btn_height }}px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
     {{ block.settings.btn_text }}
   </button>
 

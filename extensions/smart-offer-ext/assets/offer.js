@@ -63,10 +63,18 @@ document.addEventListener('DOMContentLoaded', function () {
                     step1.style.display = 'none';
 
                     const addToCartBtn = document.createElement('button');
-                    addToCartBtn.innerText = "Acheter maintenant (-" + price + "€)";
-                    addToCartBtn.style.cssText = "background:green; color:white; padding:10px; border:none; margin-top:10px; cursor:pointer;";
+                    // Initial state: Disabled (Waiting for propagation)
+                    addToCartBtn.innerText = "Validation de la remise...";
+                    addToCartBtn.disabled = true;
+                    addToCartBtn.style.cssText = "background:green; color:white; padding:10px; border:none; margin-top:10px; cursor:not-allowed; width:100%; border-radius:4px; font-weight:bold; opacity:0.7;";
+
                     addToCartBtn.onclick = function () {
-                        fetch(window.Shopify.routes.root + 'cart/add.js', {
+                        addToCartBtn.innerText = "Redirection...";
+                        addToCartBtn.disabled = true;
+
+                        const root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || "/";
+
+                        fetch(root + 'cart/add.js', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -76,11 +84,31 @@ document.addEventListener('DOMContentLoaded', function () {
                                 }]
                             })
                         })
-                            .then(() => {
-                                window.location.href = `/checkout?discount=${data.code}`;
+                            .then(res => {
+                                if (res.ok) {
+                                    // Safe redirect preserving locale
+                                    window.location.href = root + `checkout?discount=${data.code}`;
+                                } else {
+                                    addToCartBtn.innerText = "Erreur (Réessayer)";
+                                    addToCartBtn.disabled = false;
+                                    alert("Impossible d'ajouter au panier.");
+                                }
+                            })
+                            .catch(err => {
+                                console.error(err);
+                                addToCartBtn.innerText = "Erreur Réseau";
+                                addToCartBtn.disabled = false;
                             });
                     };
                     feedback.appendChild(addToCartBtn);
+
+                    // Enable after 2.5s to allow Shopify propagation
+                    setTimeout(() => {
+                        addToCartBtn.innerText = `Acheter à ${price}€ (Remise incluse)`;
+                        addToCartBtn.disabled = false;
+                        addToCartBtn.style.cursor = "pointer";
+                        addToCartBtn.style.opacity = "1";
+                    }, 2500);
 
                 } else if (data.status === 'REJECTED' || data.status === 'COUNTER') {
                     feedback.innerHTML = `<p style="color:orange;">${data.message}</p><p>Contre-offre : <b>${data.counterPrice} €</b></p>`;
