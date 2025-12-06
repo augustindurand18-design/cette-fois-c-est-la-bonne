@@ -100,7 +100,16 @@ export async function action({ request }) {
             return { status: "ACCEPTED", code, message: "Offre acceptée !" };
         } else {
             // REJECT / COUNTER
-            const counterPrice = ((offerValue + minAcceptedPrice) / 2).toFixed(2);
+            // REJECT / COUNTER
+            // Ensure counter price ends in .85 (Psychological pricing) and is >= minAcceptedPrice
+            let basePrice = Math.floor(minAcceptedPrice);
+            let counterPriceVal = basePrice + 0.85;
+
+            if (counterPriceVal < minAcceptedPrice) {
+                counterPriceVal += 1.0;
+            }
+
+            const counterPrice = counterPriceVal.toFixed(2);
 
             await db.offer.create({
                 data: {
@@ -113,7 +122,7 @@ export async function action({ request }) {
             return {
                 status: "COUNTER",
                 counterPrice,
-                message: `Un peu juste... Coupons la poire en deux à ${counterPrice} € ?`
+                message: `C'est un peu juste... Je peux vous le faire à ${counterPrice} €.`
             };
         }
 
