@@ -186,6 +186,29 @@ document.addEventListener('DOMContentLoaded', function () {
                     // The backend returns a specific message or we construct one
                     // data.message from backend: "Un peu juste... "
                     addMessage(data.message || `Hmm, c'est trop bas. Je peux descendre à ${data.counterPrice}€, pas moins.`, "bot");
+
+                    if (data.counterPrice) {
+                        const acceptBtn = document.createElement("button");
+                        acceptBtn.className = "smart-offer-action-btn";
+                        acceptBtn.innerText = `Accepter à ${data.counterPrice} €`;
+                        acceptBtn.style.marginTop = "5px";
+                        acceptBtn.style.fontSize = "0.9em";
+
+                        acceptBtn.onclick = () => {
+                            input.value = data.counterPrice;
+                            handleSubmit();
+                            acceptBtn.remove(); // Remove button after clicking to prevent double submit
+                        };
+
+                        const btnContainer = document.createElement("div");
+                        btnContainer.classList.add("smart-offer-message", "bot");
+                        btnContainer.style.background = "transparent";
+                        btnContainer.style.padding = "0";
+                        btnContainer.appendChild(acceptBtn);
+                        messagesContainer.appendChild(btnContainer);
+                        scrollToBottom();
+                    }
+
                 } else {
                     addMessage("Une erreur s'est produite. Essayez encore.", "bot");
                 }
