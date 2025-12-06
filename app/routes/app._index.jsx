@@ -9,6 +9,7 @@ import {
   BlockStack,
   Box,
   Banner,
+  Select,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
@@ -44,6 +45,7 @@ export const loader = async ({ request }) => {
 
   return {
     minDiscount,
+    priceRounding: shop.priceRounding !== undefined ? shop.priceRounding : 0.85,
     stats: { total, accepted, rejected },
   };
 };
@@ -53,6 +55,7 @@ export const action = async ({ request }) => {
   const shopUrl = session.shop;
   const formData = await request.formData();
   const minDiscount = parseFloat(formData.get("minDiscount"));
+  const priceRounding = parseFloat(formData.get("priceRounding"));
 
   // Upsert Shop & Rule
   let shop = await db.shop.findUnique({ where: { shopUrl } });
@@ -63,7 +66,13 @@ export const action = async ({ request }) => {
         shopUrl,
         accessToken: session.accessToken,
         isActive: true,
+        priceRounding: !isNaN(priceRounding) ? priceRounding : 0.85,
       },
+    });
+  } else {
+    await db.shop.update({
+      where: { id: shop.id },
+      data: { priceRounding: !isNaN(priceRounding) ? priceRounding : 0.85 }
     });
   }
 
@@ -89,21 +98,26 @@ export const action = async ({ request }) => {
 };
 
 export default function Index() {
-  const { minDiscount, stats } = useLoaderData();
+  const { minDiscount, priceRounding, stats } = useLoaderData();
   const fetcher = useFetcher();
 
   // Transform 0.8 -> 20 (%)
   const [discountValue, setDiscountValue] = useState(Math.round((1 - minDiscount) * 100));
+  const [rounding, setRounding] = useState(priceRounding ? priceRounding.toString() : "0.85");
 
   const handleSliderChange = (value) => {
     setDiscountValue(value);
   };
 
+  const handleTrendingChange = (value) => {
+    setRounding(value);
+  }
+
   const handleSave = () => {
     // Transform 20 -> 0.8
     const newMinDiscount = 1 - (discountValue / 100);
     fetcher.submit(
-      { minDiscount: newMinDiscount.toString() },
+      { minDiscount: newMinDiscount.toString(), priceRounding: rounding },
       { method: "POST" }
     );
   };
@@ -138,6 +152,21 @@ export default function Index() {
                   value={discountValue}
                   onChange={handleSliderChange}
                   suffix={`${discountValue}%`}
+                />
+              </Box>
+              <Box padding="200">
+                <Select
+                  label="Arrondi des prix (.XX)"
+                  options={[
+                    { label: '.85 (Psychologique)', value: '0.85' },
+                    { label: '.99 (Classique)', value: '0.99' },
+                    { label: '.95', value: '0.95' },
+                    { label: '.90', value: '0.90' },
+                    { label: '.50', value: '0.50' },
+                    { label: '.00 (Rond)', value: '0.00' },
+                  ]}
+                  onChange={handleTrendingChange}
+                  value={rounding}
                 />
               </Box>
               <Box>

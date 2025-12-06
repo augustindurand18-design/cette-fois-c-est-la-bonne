@@ -33,6 +33,7 @@ model Shop {
   shopUrl     String   @unique
   accessToken String?  // Optional because sometimes we might just want to track the shop
   isActive    Boolean  @default(false)
+  priceRounding Float    @default(0.85)
   rules       Rule[]
   offers      Offer[]
   createdAt   DateTime @default(now())

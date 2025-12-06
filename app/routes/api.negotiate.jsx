@@ -44,7 +44,9 @@ export async function action({ request }) {
         }
         const originalPrice = parseFloat(price);
 
-        const minAcceptedPrice = originalPrice * minDiscountMultiplier;
+        // Fix floating point precision issues comparison
+        const rawMinPrice = originalPrice * minDiscountMultiplier;
+        const minAcceptedPrice = Math.round(rawMinPrice * 100) / 100;
         const offerValue = parseFloat(offerPrice);
 
         if (offerValue >= minAcceptedPrice) {
@@ -126,9 +128,10 @@ export async function action({ request }) {
             // Ensure we don't go below floor (redundant but safe)
             if (targetPrice < minAcceptedPrice) targetPrice = minAcceptedPrice;
 
-            // Apply .85 rule
+            // Apply configurable rounding rule
+            const roundingEnding = shop.priceRounding !== undefined ? shop.priceRounding : 0.85;
             let basePrice = Math.floor(targetPrice);
-            let counterPriceVal = basePrice + 0.85;
+            let counterPriceVal = basePrice + roundingEnding;
 
             // If rounding pushed it below calc price (unlikely for +0.85) or below min
             if (counterPriceVal < minAcceptedPrice) {
