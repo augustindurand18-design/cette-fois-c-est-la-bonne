@@ -37,7 +37,6 @@ export async function action({ request }) {
         const minDiscountMultiplier = rule ? rule.minDiscount : 0.8;
 
         // 3. Logic
-        // 3. Logic
         // Fetch Real Price from Shopify
         const price = await getProductPrice(shop.shopUrl, shop.accessToken, productId);
         if (!price) {
@@ -58,8 +57,6 @@ export async function action({ request }) {
             // 4. Generate REAL Discount Code via Shopify GraphGL
             const code = `OFFER-${Math.floor(Math.random() * 1000000)}`;
 
-            // RE-ENABLING REAL LOGIC
-            // try {
             // Determine GID
             const productGid = `gid://shopify/Product/${productId}`;
             console.log("Negotiate API: Attempting to create discount", { code, discountAmount, productGid });
@@ -83,11 +80,6 @@ export async function action({ request }) {
                 return { status: "ERROR", error: "Failed to create discount in Shopify. Check console." };
             }
 
-            // } catch (apiError) {
-            //     console.error("Shopify API Error", apiError);
-            //     return { status: "ERROR", error: "API Exception: " + apiError.message };
-            // }
-
             await db.offer.create({
                 data: {
                     shopId: shop.id,
@@ -99,14 +91,52 @@ export async function action({ request }) {
 
             return { status: "ACCEPTED", code, message: "Offre acceptée !" };
         } else {
-            // REJECT / COUNTER
-            // REJECT / COUNTER
-            // Ensure counter price ends in .85 (Psychological pricing) and is >= minAcceptedPrice
-            let basePrice = Math.floor(minAcceptedPrice);
+            // REJECT / COUNTER for Iterative Negotiation
+
+            const attempt = body.round || 1;
+            const maxAttempts = 3;
+
+            if (attempt > maxAttempts) {
+                return {
+                    status: "REJECTED",
+                    counterPrice: minAcceptedPrice.toFixed(2),
+                    message: `Désolé, je ne peux pas descendre plus bas que ${minAcceptedPrice.toFixed(2)} €. C'est mon dernier prix.`
+                };
+            }
+
+            // Strategy: Close the gap progressively
+            // Attempt 1: Very conservative.
+            // Attempt 2: Middle ground.
+            // Attempt 3: Max discount (MinAccepted).
+
+            let targetPrice;
+            const priceGap = originalPrice - minAcceptedPrice; // The margin slack
+
+            if (attempt === 1) {
+                // Give 30% of slack
+                targetPrice = originalPrice - (priceGap * 0.3);
+            } else if (attempt === 2) {
+                // Give 60% of slack
+                targetPrice = originalPrice - (priceGap * 0.6);
+            } else {
+                // Give 100% of slack (Floor)
+                targetPrice = minAcceptedPrice;
+            }
+
+            // Ensure we don't go below floor (redundant but safe)
+            if (targetPrice < minAcceptedPrice) targetPrice = minAcceptedPrice;
+
+            // Apply .85 rule
+            let basePrice = Math.floor(targetPrice);
             let counterPriceVal = basePrice + 0.85;
 
+            // If rounding pushed it below calc price (unlikely for +0.85) or below min
             if (counterPriceVal < minAcceptedPrice) {
                 counterPriceVal += 1.0;
+            }
+            // If rounding pushed it above original (unlikely)
+            if (counterPriceVal > originalPrice) {
+                counterPriceVal = originalPrice - 0.15; // fallback
             }
 
             const counterPrice = counterPriceVal.toFixed(2);

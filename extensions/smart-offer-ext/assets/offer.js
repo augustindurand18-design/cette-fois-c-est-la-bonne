@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Chat State
     let isThinking = false;
+    let attemptCount = 0;
 
     // Helper: Scroll to bottom
     const scrollToBottom = () => {
@@ -73,6 +74,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const price = input.value;
         if (!price) return;
 
+        attemptCount++; // Increment attempt
+
         // User Message
         addMessage(`${price} €`, "user");
         input.value = "";
@@ -88,7 +91,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 body: JSON.stringify({
                     productId: window.smartOfferConfig.productId,
                     offerPrice: price,
-                    shopUrl: window.smartOfferConfig.shopUrl
+                    shopUrl: window.smartOfferConfig.shopUrl,
+                    round: attemptCount
                 })
             });
 
