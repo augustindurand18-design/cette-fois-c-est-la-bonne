@@ -17,15 +17,24 @@
   </button>
 
   <div id="smart-offer-modal" class="smart-offer-modal" style="display: none;">
-    <div class="smart-offer-modal-content">
-      <span class="smart-offer-close">&times;</span>
-      <h3>Négocier le prix</h3>
-      <div id="smart-offer-step-1">
-          <p>Quel est votre meilleur prix ?</p>
-          <input type="number" id="smart-offer-input" placeholder="Prix (€)" />
-          <button id="smart-offer-submit">Envoyer l'offre</button>
+    <div class="smart-offer-chat-container">
+      <div class="smart-offer-header">
+        <span class="smart-offer-title">Négociation en direct</span>
+        <span class="smart-offer-close">&times;</span>
       </div>
-      <div id="smart-offer-feedback"></div>
+      
+      <div id="smart-offer-messages" class="smart-offer-messages">
+        <!-- Messages will appear here dynamically -->
+      </div>
+
+      <div class="smart-offer-input-area">
+        <input type="number" id="smart-offer-input" placeholder="Votre offre (€)..." />
+        <button id="smart-offer-submit">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 </div>
