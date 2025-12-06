@@ -53,6 +53,55 @@ document.addEventListener('DOMContentLoaded', function () {
     btn.onclick = function () {
         modal.style.display = "block";
         if (messagesContainer.children.length === 0) {
+            // Add Product Preview
+            const config = window.smartOfferConfig;
+            if (config.productImage && config.productTitle) {
+                const card = document.createElement("div");
+                card.className = "smart-offer-product-card";
+                card.style.display = "flex";
+                card.style.alignItems = "center";
+                card.style.padding = "10px";
+                card.style.marginBottom = "10px";
+                card.style.background = "#f9f9f9";
+                card.style.borderRadius = "8px";
+                card.style.border = "1px solid #ddd";
+
+                const img = document.createElement("img");
+                img.src = config.productImage;
+                img.style.width = "50px";
+                img.style.height = "50px";
+                img.style.objectFit = "cover";
+                img.style.borderRadius = "4px";
+                img.style.marginRight = "10px";
+
+                const info = document.createElement("div");
+                info.style.display = "flex";
+                info.style.flexDirection = "column";
+
+                const title = document.createElement("span");
+                title.innerText = config.productTitle;
+                title.style.fontWeight = "bold";
+                title.style.fontSize = "0.9em";
+
+                const price = document.createElement("span");
+                price.innerText = config.productPrice;
+                price.style.fontSize = "0.85em";
+                price.style.color = "#555";
+
+                info.appendChild(title);
+                info.appendChild(price);
+                card.appendChild(img);
+                card.appendChild(info);
+
+                const cardContainer = document.createElement("div");
+                cardContainer.style.width = "100%";
+                cardContainer.style.display = "flex";
+                cardContainer.style.justifyContent = "center";
+                cardContainer.appendChild(card);
+
+                messagesContainer.appendChild(cardContainer);
+            }
+
             addMessage("Bonjour ! 👋 Je peux vous faire une remise si vous me proposez un prix raisonnable. Quel est votre prix ?", "bot");
         }
     }

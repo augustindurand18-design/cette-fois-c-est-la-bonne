@@ -43,6 +43,9 @@
   window.smartOfferConfig = {
     productId: "{{ product.id }}",
     variantId: "{{ product.selected_or_first_available_variant.id }}",
-    shopUrl: "{{ shop.permanent_domain }}"
+    shopUrl: "{{ shop.permanent_domain }}",
+    productImage: "{{ product.featured_image | image_url: width: 100 }}",
+    productTitle: "{{ product.title | escape }}",
+    productPrice: "{{ product.price | money }}"
   };
 </script>
