@@ -18,10 +18,13 @@ export default function App() {
   return (
     <AppProvider embedded apiKey={apiKey}>
       <PolarisAppProvider>
-        <s-app-nav>
-          <s-link href="/app">Home</s-link>
-          <s-link href="/app/additional">Additional page</s-link>
-        </s-app-nav>
+        <ui-nav-menu>
+          <a href="/app" rel="home">
+            Tableau de Bord
+          </a>
+          <a href="/app/rules">Règles</a>
+          <a href="/app/customization">Personnalisation</a>
+        </ui-nav-menu>
         <Outlet />
       </PolarisAppProvider>
     </AppProvider>

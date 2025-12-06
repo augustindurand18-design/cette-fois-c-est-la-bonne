@@ -1,19 +1,15 @@
-import { useEffect, useState, useCallback } from "react";
-import { useFetcher, useLoaderData } from "react-router";
+import { useLoaderData } from "react-router";
 import {
   Page,
   Layout,
   Card,
-  RangeSlider,
   Text,
   BlockStack,
+  IndexTable,
+  Badge,
+  useIndexResourceState,
   Box,
-  Banner,
-  Select,
-  TextField,
-  FormLayout,
-  InlineStack,
-  Divider,
+  InlineGrid
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
@@ -22,439 +18,141 @@ export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shopUrl = session.shop;
 
-  // 1. Get Shop & Stats
   const shop = await db.shop.findUnique({
     where: { shopUrl },
     include: {
-      offers: true,
-      rules: true,
+      offers: {
+        orderBy: { createdAt: 'desc' },
+        take: 10
+      }
     },
   });
 
   if (!shop) {
     return {
-      minDiscount: 0.8,
-      priceRounding: 0.85,
-      botWelcomeMsg: "Bonjour ! 👋 Je peux vous faire une remise si vous me proposez un prix raisonnable. Quel est votre prix ?",
-      botRejectMsg: "C'est un peu juste... Je peux vous le faire à {price} €.",
-      botSuccessMsg: "C'est d'accord pour {price}€ ! 🎉",
-      widgetColor: "#000000",
-      stats: { total: 0, accepted: 0, rejected: 0 }
+      stats: { total: 0, accepted: 0, rejected: 0 },
+      recentOffers: []
     };
   }
 
-  // Calculate Stats
-  const total = shop.offers.length;
-  const accepted = shop.offers.filter((o) => o.status === "ACCEPTED").length;
-  const rejected = shop.offers.filter((o) => o.status === "REJECTED").length;
+  // Calculate Stats using separate queries to get accurate totals (since shop.offers is limited to 10)
+  const allOffersCount = await db.offer.count({ where: { shopId: shop.id } });
+  const acceptedCount = await db.offer.count({ where: { shopId: shop.id, status: "ACCEPTED" } });
+  const rejectedCount = await db.offer.count({ where: { shopId: shop.id, status: "REJECTED" } });
 
-  // Get Global Rule
-  const globalRule = shop.rules.find((r) => !r.collectionId && !r.productId);
-  const minDiscount = globalRule ? globalRule.minDiscount : 0.8;
+  const recentOffers = shop.offers.map(offer => ({
+    id: offer.id,
+    productTitle: offer.productTitle || "Produit inconnu",
+    originalPrice: offer.originalPrice,
+    offerPrice: offer.offerPrice,
+    status: offer.status,
+    createdAt: offer.createdAt,
+  }));
 
   return {
-    minDiscount,
-    priceRounding: shop.priceRounding !== undefined ? shop.priceRounding : 0.85,
-    botWelcomeMsg: shop.botWelcomeMsg,
-    botRejectMsg: shop.botRejectMsg,
-    botSuccessMsg: shop.botSuccessMsg,
-    widgetColor: shop.widgetColor,
-    stats: { total, accepted, rejected },
+    stats: { total: allOffersCount, accepted: acceptedCount, rejected: rejectedCount },
+    recentOffers,
   };
-};
-
-export const action = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  const shopUrl = session.shop;
-  const formData = await request.formData();
-
-  const minDiscount = parseFloat(formData.get("minDiscount"));
-  const priceRounding = parseFloat(formData.get("priceRounding"));
-  const botWelcomeMsg = formData.get("botWelcomeMsg");
-  const botRejectMsg = formData.get("botRejectMsg");
-  const botSuccessMsg = formData.get("botSuccessMsg");
-  const widgetColor = formData.get("widgetColor");
-
-  // Upsert Shop & Rule
-  let shop = await db.shop.findUnique({ where: { shopUrl } });
-
-  const shopData = {
-    priceRounding: !isNaN(priceRounding) ? priceRounding : 0.85,
-    botWelcomeMsg,
-    botRejectMsg,
-    botSuccessMsg,
-    widgetColor,
-  };
-
-  if (!shop) {
-    shop = await db.shop.create({
-      data: {
-        id: session.id,
-        shopUrl,
-        accessToken: session.accessToken,
-        isActive: true,
-        ...shopData
-      },
-    });
-  } else {
-    await db.shop.update({
-      where: { id: shop.id },
-      data: shopData
-    });
-  }
-
-  const existingRule = await db.rule.findFirst({
-    where: { shopId: shop.id, collectionId: null, productId: null },
-  });
-
-  if (existingRule) {
-    await db.rule.update({
-      where: { id: existingRule.id },
-      data: { minDiscount },
-    });
-  } else {
-    await db.rule.create({
-      data: {
-        shopId: shop.id,
-        minDiscount,
-      },
-    });
-  }
-
-  return { success: true };
-};
-
-const TONE_PRESETS = {
-  standard: {
-    label: "Standard",
-    welcome: "Bonjour ! 👋 Je peux vous faire une remise si vous me proposez un prix raisonnable. Quel est votre prix ?",
-    reject: "C'est un peu juste... Je peux vous le faire à {price} €.",
-    success: "C'est d'accord pour {price}€ ! 🎉"
-  },
-  friendly: {
-    label: "Amical",
-    welcome: "Salut ! 👋 Je suis d'humeur négociatrice aujourd'hui. Fais-moi ta meilleure offre !",
-    reject: "Oula, c'est bas ! 😅 Je peux descendre à {price} € pour te faire plaisir.",
-    success: "Top ! Vendu pour {price}€ ! Fonce ! 🚀"
-  },
-  professional: {
-    label: "Professionnel",
-    welcome: "Bonjour. Nous sommes ouverts à la discussion. Quelle est votre proposition de prix ?",
-    reject: "Cette offre est en dessous de notre seuil. Nous pouvons vous proposer {price} €.",
-    success: "Votre offre de {price}€ est acceptée. Merci de votre confiance."
-  },
-  minimalist: {
-    label: "Direct / Minimaliste",
-    welcome: "Faites une offre.",
-    reject: "Trop bas. Min: {price} €.",
-    success: "Ok pour {price}€."
-  }
 };
 
 export default function Index() {
-  const loaderData = useLoaderData();
-  const fetcher = useFetcher();
+  const { stats, recentOffers } = useLoaderData();
 
-  // State
-  // Rules
-  const [discountValue, setDiscountValue] = useState(Math.round((1 - loaderData.minDiscount) * 100));
-  const [rounding, setRounding] = useState(loaderData.priceRounding ? loaderData.priceRounding.toString() : "0.85");
-
-  // Customization
-  // Customization
-  const initialWelcome = loaderData.botWelcomeMsg || TONE_PRESETS.standard.welcome;
-  const initialReject = loaderData.botRejectMsg || TONE_PRESETS.standard.reject;
-  const initialSuccess = loaderData.botSuccessMsg || TONE_PRESETS.standard.success;
-
-  const [welcomeMsg, setWelcomeMsg] = useState(initialWelcome);
-  const [rejectMsg, setRejectMsg] = useState(initialReject);
-  const [successMsg, setSuccessMsg] = useState(initialSuccess);
-  const [color, setColor] = useState(loaderData.widgetColor || "#000000");
-
-  // Detect Tone
-  const [tone, setTone] = useState(() => {
-    for (const [key, preset] of Object.entries(TONE_PRESETS)) {
-      if (
-        initialWelcome === preset.welcome &&
-        initialReject === preset.reject &&
-        initialSuccess === preset.success
-      ) {
-        return key;
-      }
-    }
-    return "custom";
-  });
-
-  const handleSliderChange = (value) => setDiscountValue(value);
-  const handleTrendingChange = (value) => setRounding(value);
-
-  const handleToneChange = (newTone) => {
-    setTone(newTone);
-    if (TONE_PRESETS[newTone]) {
-      setWelcomeMsg(TONE_PRESETS[newTone].welcome);
-      setRejectMsg(TONE_PRESETS[newTone].reject);
-      setSuccessMsg(TONE_PRESETS[newTone].success);
-    }
+  const resourceName = {
+    singular: 'offre',
+    plural: 'offres',
   };
 
-  const handleSave = () => {
-    const newMinDiscount = 1 - (discountValue / 100);
-    fetcher.submit(
-      {
-        minDiscount: newMinDiscount.toString(),
-        priceRounding: rounding,
-        botWelcomeMsg: welcomeMsg,
-        botRejectMsg: rejectMsg,
-        botSuccessMsg: successMsg,
-        widgetColor: color
-      },
-      { method: "POST" }
-    );
-  };
+  const { selectedResources, allResourcesSelected, handleSelectionChange } =
+    useIndexResourceState(recentOffers);
+
+  const rowMarkup = recentOffers.map(
+    ({ id, productTitle, originalPrice, offerPrice, status, createdAt }, index) => (
+      <IndexTable.Row
+        id={id}
+        key={id}
+        selected={selectedResources.includes(id)}
+        position={index}
+      >
+        <IndexTable.Cell>
+          <Text variant="bodyMd" fontWeight="bold">
+            {productTitle}
+          </Text>
+        </IndexTable.Cell>
+        <IndexTable.Cell>{new Date(createdAt).toLocaleDateString()} {new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</IndexTable.Cell>
+        <IndexTable.Cell>
+          <Text as="span" variant="bodyMd" decoration="lineThrough" tone="subdued">
+            {originalPrice}€
+          </Text>
+          <Text as="span" variant="bodyMd" fontWeight="bold">
+            {' '}→ {offerPrice}€
+          </Text>
+        </IndexTable.Cell>
+        <IndexTable.Cell>
+          <Badge tone={status === 'ACCEPTED' ? 'success' : status === 'REJECTED' ? 'critical' : 'attention'}>
+            {status}
+          </Badge>
+        </IndexTable.Cell>
+      </IndexTable.Row>
+    ),
+  );
 
   return (
-    <Page title="SmartOffer Dashboard" primaryAction={{ content: fetcher.state !== "idle" ? "Enregistrement..." : "Enregistrer", onAction: handleSave }}>
+    <Page title="Tableau de Bord">
       <Layout>
-        {/* TOP SECTION: GLOBAL RULES */}
+        {/* KPI Section */}
         <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">Règles de Négociation Globales</Text>
-
-              <Box paddingBlockStart="200">
-                <Text variant="bodyMd" fontWeight="semibold">Rabais Maximum Autorisé: {discountValue}%</Text>
-                <RangeSlider
-                  output
-                  label="Le bot n'acceptera pas d'offres en dessous de ce seuil."
-                  min={0}
-                  max={50}
-                  step={1}
-                  value={discountValue}
-                  onChange={handleSliderChange}
-                  suffix={`${discountValue}%`}
-                />
-              </Box>
-
-              <Select
-                label="Arrondi des contre-offres (.XX)"
-                options={[
-                  { label: '.85 (Psychologique)', value: '0.85' },
-                  { label: '.99 (Classique)', value: '0.99' },
-                  { label: '.95', value: '0.95' },
-                  { label: '.90', value: '0.90' },
-                  { label: '.50', value: '0.50' },
-                  { label: '.00 (Rond)', value: '0.00' },
-                ]}
-                onChange={handleTrendingChange}
-                value={rounding}
-              />
-
-              <Banner title="Information" tone="info">
-                  Le bot acceptera toute offre >= {100 - discountValue}% du prix.
-              </Banner>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-
-        {/* SIDE SECTION: STATS */}
-        <Layout.Section variant="oneThird">
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">Performance</Text>
-              <Box>
-                <InlineStack align="space-between">
-                  <Text>Total Offres:</Text>
-                  <Text fontWeight="bold">{loaderData.stats.total}</Text>
-                </InlineStack>
-                <Divider />
-                <InlineStack align="space-between">
-                  <Text tone="success">Acceptées:</Text>
-                  <Text fontWeight="bold" tone="success">{loaderData.stats.accepted}</Text>
-                </InlineStack>
-                <InlineStack align="space-between">
-                  <Text tone="critical">Refusées:</Text>
-                  <Text fontWeight="bold" tone="critical">{loaderData.stats.rejected}</Text>
-                </InlineStack>
-              </Box>
-            </BlockStack>
-          </Card>
-          <Box paddingBlockStart="400">
+          <InlineGrid columns={3} gap="400">
             <Card>
-              <Text as="h2" variant="headingMd">App Embed</Text>
-              <p style={{ marginTop: '10px' }}>Activez l'extension dans votre éditeur de thème pour afficher le bouton.</p>
+              <BlockStack gap="200">
+                <Text variant="headingSm" as="h3" tone="subdued">Total Offres</Text>
+                <Text variant="headingLg" as="p">{stats.total}</Text>
+              </BlockStack>
             </Card>
-          </Box>
+            <Card>
+              <BlockStack gap="200">
+                <Text variant="headingSm" as="h3" tone="subdued">Acceptées</Text>
+                <Text variant="headingLg" as="p" tone="success">{stats.accepted}</Text>
+              </BlockStack>
+            </Card>
+            <Card>
+              <BlockStack gap="200">
+                <Text variant="headingSm" as="h3" tone="subdued">Refusées</Text>
+                <Text variant="headingLg" as="p" tone="critical">{stats.rejected}</Text>
+              </BlockStack>
+            </Card>
+          </InlineGrid>
         </Layout.Section>
 
-        {/* BOTTOM SECTION: CUSTOMIZATION */}
+        {/* Recent Offers Table */}
         <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">Personnalisation du Bot</Text>
-
-              <Select
-                label="Ton de la conversation"
-                options={[
-                  { label: 'Personnalisé', value: 'custom' },
-                  { label: 'Standard', value: 'standard' },
-                  { label: 'Amical / Sympa', value: 'friendly' },
-                  { label: 'Professionnel', value: 'professional' },
-                  { label: 'Direct / Minimaliste', value: 'minimalist' },
+          <Card padding="0">
+            <Box padding="400">
+              <Text variant="headingMd" as="h3">Offres Récentes</Text>
+            </Box>
+            {recentOffers.length > 0 ? (
+              <IndexTable
+                resourceName={resourceName}
+                itemCount={recentOffers.length}
+                selectedItemsCount={allResourcesSelected ? 'All' : selectedResources.length}
+                onSelectionChange={handleSelectionChange}
+                headings={[
+                  { title: 'Produit' },
+                  { title: 'Date' },
+                  { title: 'Offre' },
+                  { title: 'Statut' },
                 ]}
-                onChange={handleToneChange}
-                value={tone}
-                helpText="Sélectionnez un style pour pré-remplir les messages ci-dessous."
-              />
-
-              <FormLayout>
-                <Text variant="headingSm" as="h6">Couleur du Widget</Text>
-                <div style={{ display: "flex", alignItems: "end", gap: "10px", marginBottom: "1rem" }}>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px" }}>
-                    <div
-                      style={{
-                        width: "50px",
-                        height: "50px",
-                        borderRadius: "8px",
-                        backgroundColor: color,
-                        border: "2px solid #ddd",
-                        cursor: "pointer",
-                        boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center"
-                      }}
-                      onClick={() => document.getElementById("native-color-picker").click()}
-                      title="Cliquer pour changer la couleur"
-                    >
-                      <span style={{ fontSize: "20px", filter: "drop-shadow(0 0 2px rgba(255,255,255,0.8))" }}>🎨</span>
-                    </div>
-                    <Text variant="bodyXs" tone="subdued">Cliquer</Text>
-                  </div>
-
-                  <input
-                    type="color"
-                    id="native-color-picker"
-                    value={color}
-                    onChange={(e) => setColor(e.target.value)}
-                    style={{ visibility: "hidden", position: "absolute", width: 0, height: 0 }}
-                  />
-                  <div style={{ flexGrow: 1 }}>
-                    <TextField
-                      label="Code Hex"
-                      value={color}
-                      onChange={setColor}
-                      autoComplete="off"
-                      placeholder="#000000"
-                      helpText="Ou entrez le code couleur manuellement."
-                    />
-                  </div>
-                </div>
-
-                {/* Preview Box */}
-                <Box paddingBlockEnd="400">
-                  <Text variant="headingSm" as="h6">Aperçu du Chat</Text>
-                  <div style={{
-                    border: "1px solid #e1e3e5",
-                    borderRadius: "12px",
-                    overflow: "hidden",
-                    maxWidth: "350px",
-                    margin: "10px 0",
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif'
-                  }}>
-                    {/* Header */}
-                    <div style={{
-                      backgroundColor: color,
-                      color: "#fff",
-                      padding: "12px 16px",
-                      fontWeight: "600",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center"
-                    }}>
-                      <span>Négociation en direct</span>
-                      <span>✕</span>
-                    </div>
-                    {/* Body */}
-                    <div style={{
-                      backgroundColor: "#fff",
-                      padding: "16px",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "12px",
-                      minHeight: "150px"
-                    }}>
-                      {/* Bot Msg */}
-                      <div style={{
-                        alignSelf: "flex-start",
-                        backgroundColor: "#f1f1f1",
-                        color: "#000",
-                        padding: "10px 14px",
-                        borderRadius: "18px 18px 18px 4px",
-                        maxWidth: "85%",
-                        fontSize: "14px",
-                        lineHeight: "1.4"
-                      }}>
-                        {welcomeMsg || "Bonjour ! 👋"}
-                      </div>
-                      {/* User Msg */}
-                      <div style={{
-                        alignSelf: "flex-end",
-                        backgroundColor: "#007AFF",
-                        color: "#fff",
-                        padding: "10px 14px",
-                        borderRadius: "18px 18px 4px 18px",
-                        maxWidth: "85%",
-                        fontSize: "14px"
-                      }}>
-                        85 €
-                      </div>
-                      {/* Bot Logic */}
-                      <div style={{
-                        alignSelf: "flex-start",
-                        backgroundColor: "#f1f1f1",
-                        color: "#000",
-                        padding: "10px 14px",
-                        borderRadius: "18px 18px 18px 4px",
-                        maxWidth: "85%",
-                        fontSize: "14px",
-                        lineHeight: "1.4"
-                      }}>
-                        {rejectMsg ? rejectMsg.replace("{price}", "90.00") : "Je peux faire 90.00 €."}
-                      </div>
-                    </div>
-                  </div>
-                </Box>
-
-                <TextField
-                  label="Message de Bienvenue"
-                  value={welcomeMsg}
-                  onChange={(val) => { setWelcomeMsg(val); setTone('custom'); }}
-                  autoComplete="off"
-                  multiline={2}
-                />
-
-                <TextField
-                  label="Message de Contre-offre"
-                  value={rejectMsg}
-                  onChange={(val) => { setRejectMsg(val); setTone('custom'); }}
-                  autoComplete="off"
-                  multiline={2}
-                  helpText="Si vous ne mettez pas le prix, il sera ajouté automatiquement à la fin."
-                />
-
-                <TextField
-                  label="Message de Succès"
-                  value={successMsg}
-                  onChange={(val) => { setSuccessMsg(val); setTone('custom'); }}
-                  autoComplete="off"
-                  multiline={2}
-                  helpText="Si vous ne mettez pas le prix, il sera ajouté automatiquement à la fin."
-                />
-              </FormLayout>
-            </BlockStack>
+                selectable={false}
+              >
+                {rowMarkup}
+              </IndexTable>
+            ) : (
+              <Box padding="400">
+                <Text tone="subdued" as="p">Aucune offre pour le moment.</Text>
+              </Box>
+            )}
           </Card>
         </Layout.Section>
-
       </Layout>
     </Page>
   );
