@@ -1,7 +1,33 @@
 import db from "../db.server";
 
-export async function loader() {
-    return new Response("Method Not Allowed", { status: 405 });
+export async function loader({ request }) {
+    const url = new URL(request.url);
+    const shopUrl = url.searchParams.get("shop");
+
+    if (!shopUrl) {
+        return new Response(JSON.stringify({ error: "Missing shop param" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+        });
+    }
+
+    const shop = await db.shop.findUnique({ where: { shopUrl } });
+
+    if (!shop) {
+        return new Response(JSON.stringify({ error: "Shop not found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" }
+        });
+    }
+
+    return new Response(JSON.stringify({
+        botWelcomeMsg: shop.botWelcomeMsg,
+        botRejectMsg: shop.botRejectMsg,
+        botSuccessMsg: shop.botSuccessMsg,
+        widgetColor: shop.widgetColor,
+    }), {
+        headers: { "Content-Type": "application/json" }
+    });
 }
 
 export async function action({ request }) {
