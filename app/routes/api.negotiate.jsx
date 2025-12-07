@@ -25,6 +25,7 @@ export async function loader({ request }) {
         botRejectMsg: shop.botRejectMsg,
         botSuccessMsg: shop.botSuccessMsg,
         widgetColor: shop.widgetColor,
+        isActive: shop.isActive
     }), {
         headers: { "Content-Type": "application/json" }
     });
@@ -38,7 +39,6 @@ export async function action({ request }) {
 
     try {
         const body = await request.json();
-        console.log("Negotiate API: Body Parsed", body);
         const { productId, offerPrice, shopUrl } = body;
 
         if (!productId || !offerPrice || !shopUrl) {
@@ -48,45 +48,70 @@ export async function action({ request }) {
         // 1. Verify Shop & Get Token
         const shop = await db.shop.findUnique({ where: { shopUrl } });
         if (!shop || !shop.isActive) {
-            return new Response(JSON.stringify({ error: "Shop not found or inactive" }), { status: 404 });
+            return new Response(JSON.stringify({ error: "Shop negotiation is disabled." }), { status: 403 });
         }
 
-        // 2. Fetch Rule
-        const rule = await db.rule.findFirst({
+        // 2. Fetch Product Data (Price + Collections)
+        // We require this early to check Collection Rules if needed
+        const productData = await getProductData(shop.shopUrl, shop.accessToken, productId);
+        if (!productData) {
+            return { status: "ERROR", error: "Could not fetch product price" };
+        }
+
+        const originalPrice = parseFloat(productData.price);
+        const compareAtPrice = productData.compareAtPrice ? parseFloat(productData.compareAtPrice) : null;
+
+        // 3. Determine Rule
+        const productGid = `gid://shopify/Product/${productId}`;
+
+        // Prioritize Specific Product Rule (Active Only)
+        let rule = await db.rule.findFirst({
             where: {
                 shopId: shop.id,
-                collectionId: null,
-                productId: null,
+                productId: productGid,
+                isEnabled: true
             },
         });
 
-        const minDiscountMultiplier = rule ? rule.minDiscount : 0.8;
+        // Check Collection Rules if no Specific Product Rule found
+        if (!rule) {
+            const collectionRules = await db.rule.findMany({
+                where: {
+                    shopId: shop.id,
+                    collectionId: { not: null },
+                    isEnabled: true
+                }
+            });
 
-        // 3. Logic
-        // Fetch Real Price from Shopify
-        const price = await getProductPrice(shop.shopUrl, shop.accessToken, productId);
-        if (!price) {
-            return { status: "ERROR", error: "Could not fetch product price" };
+            if (collectionRules.length > 0 && productData.collections) {
+                // Find first rule where product's collections include the rule's collectionId
+                // Note: productData.collections are GIDs
+                rule = collectionRules.find(r => productData.collections.includes(r.collectionId));
+            }
         }
-        const originalPrice = parseFloat(price);
 
-        // Fix floating point precision issues comparison
+        // Fallback or Global Rule if we had one (but we removed global generic rule earlier)
+        // Default to minDiscount 1.0 (no discount) if no rule matches
+        const minDiscountMultiplier = rule ? rule.minDiscount : 1.0;
+
+        // Check Sale Items Restriction
+        if (!shop.allowSaleItems && compareAtPrice && compareAtPrice > originalPrice) {
+            return {
+                status: "REJECTED",
+                counterPrice: originalPrice.toFixed(2),
+                message: "Désolé, je ne peux pas négocier sur les articles déjà soldés."
+            };
+        }
+
         const rawMinPrice = originalPrice * minDiscountMultiplier;
         const minAcceptedPrice = Math.round(rawMinPrice * 100) / 100;
         const offerValue = parseFloat(offerPrice);
 
         if (offerValue >= minAcceptedPrice) {
             // ACCEPT OFFER
-
-            // Calculate discount amount needed to reach offer price
-            // Original: 100, Offer: 85 -> Discount: 15
             const discountAmount = originalPrice - offerValue;
-
-            // 4. Generate REAL Discount Code via Shopify GraphGL
             const code = `OFFER-${Math.floor(Math.random() * 1000000)}`;
 
-            // Determine GID
-            const productGid = `gid://shopify/Product/${productId}`;
             console.log("Negotiate API: Attempting to create discount", { code, discountAmount, productGid });
 
             if (!shop.accessToken) {
@@ -94,7 +119,6 @@ export async function action({ request }) {
                 return { status: "ERROR", error: "Missing Access Token. Please reinstall app." };
             }
 
-            // Create Discount
             const createdCode = await createShopifyDiscount(
                 shop.shopUrl,
                 shop.accessToken,
@@ -104,7 +128,6 @@ export async function action({ request }) {
             );
 
             if (!createdCode) {
-                // It failed but handled inside helper
                 return { status: "ERROR", error: "Failed to create discount in Shopify. Check console." };
             }
 
@@ -117,12 +140,12 @@ export async function action({ request }) {
                 },
             });
 
-            return { status: "ACCEPTED", code, message: "Offre acceptée !" };
+            return { status: "ACCEPTED", code, message: shop.botSuccessMsg.replace("{price}", offerValue.toFixed(2)) };
         } else {
             // REJECT / COUNTER for Iterative Negotiation
 
             const attempt = body.round || 1;
-            const maxAttempts = 3;
+            const maxAttempts = shop.maxRounds || 3;
 
             if (attempt > maxAttempts) {
                 return {
@@ -132,40 +155,46 @@ export async function action({ request }) {
                 };
             }
 
-            // Strategy: Close the gap progressively
-            // Attempt 1: Very conservative.
-            // Attempt 2: Middle ground.
-            // Attempt 3: Max discount (MinAccepted).
-
+            // Strategy logic
             let targetPrice;
-            const priceGap = originalPrice - minAcceptedPrice; // The margin slack
+            const priceGap = originalPrice - minAcceptedPrice;
+            const strategy = shop.strategy || 'moderate';
 
-            if (attempt === 1) {
-                // Give 30% of slack
-                targetPrice = originalPrice - (priceGap * 0.3);
-            } else if (attempt === 2) {
-                // Give 60% of slack
-                targetPrice = originalPrice - (priceGap * 0.6);
-            } else {
-                // Give 100% of slack (Floor)
-                targetPrice = minAcceptedPrice;
+            let concessionPercent = 0;
+
+            if (strategy === 'conciliatory') {
+                if (attempt === 1) concessionPercent = 0.50;
+                else if (attempt === 2) concessionPercent = 0.80;
+                else concessionPercent = 1.0;
+            } else if (strategy === 'aggressive') { // 'Ferme'
+                if (attempt === 1) concessionPercent = 0.10;
+                else if (attempt === 2) concessionPercent = 0.25;
+                else if (attempt === 3) concessionPercent = 0.40;
+                else concessionPercent = 0.50 + ((attempt - 3) * 0.1);
+
+                if (attempt >= maxAttempts) concessionPercent = 0.8;
+            } else { // Moderate
+                if (attempt === 1) concessionPercent = 0.30;
+                else if (attempt === 2) concessionPercent = 0.60;
+                else concessionPercent = 1.0;
             }
 
-            // Ensure we don't go below floor (redundant but safe)
+            targetPrice = originalPrice - (priceGap * concessionPercent);
+
             if (targetPrice < minAcceptedPrice) targetPrice = minAcceptedPrice;
 
-            // Apply configurable rounding rule
             const roundingEnding = shop.priceRounding !== undefined ? shop.priceRounding : 0.85;
             let basePrice = Math.floor(targetPrice);
             let counterPriceVal = basePrice + roundingEnding;
 
-            // If rounding pushed it below calc price (unlikely for +0.85) or below min
+            // Ensure sensible rounding
             if (counterPriceVal < minAcceptedPrice) {
-                counterPriceVal += 1.0;
+                // If rounding pushes below min, just define behavior, maybe slightly above min?
+                // Or stick to minAcceptedPrice if gap is tiny.
+                counterPriceVal = minAcceptedPrice;
             }
-            // If rounding pushed it above original (unlikely)
             if (counterPriceVal > originalPrice) {
-                counterPriceVal = originalPrice - 0.15; // fallback
+                counterPriceVal = originalPrice - 0.15;
             }
 
             const counterPrice = counterPriceVal.toFixed(2);
@@ -181,7 +210,7 @@ export async function action({ request }) {
             return {
                 status: "COUNTER",
                 counterPrice,
-                message: `C'est un peu juste... Je peux vous le faire à ${counterPrice} €.`
+                message: shop.botRejectMsg.replace("{price}", counterPrice)
             };
         }
 
@@ -231,7 +260,7 @@ async function createShopifyDiscount(shopDomain, accessToken, code, amount, prod
             customerGets: {
                 value: {
                     discountAmount: {
-                        amount: Math.abs(amount).toFixed(2), // Ensure positive value
+                        amount: Math.abs(amount).toFixed(2),
                         appliesOnEachItem: false
                     }
                 },
@@ -268,13 +297,29 @@ async function createShopifyDiscount(shopDomain, accessToken, code, amount, prod
     }
 }
 
-async function getProductPrice(shopDomain, accessToken, productId) {
+async function getProductData(shopDomain, accessToken, productId) {
     const query = `
       query getProduct($id: ID!) {
         product(id: $id) {
           priceRangeV2 {
             minVariantPrice {
               amount
+            }
+          }
+          collections(first: 10) {
+            nodes {
+              id
+            }
+          }
+          compareAtPriceRange {
+            minVariantPrice {
+                amount
+            }
+          }
+          variants(first: 1) {
+            nodes {
+                compareAtPrice
+                price
             }
           }
         }
@@ -296,7 +341,19 @@ async function getProductPrice(shopDomain, accessToken, productId) {
         });
 
         const json = await response.json();
-        return json.data?.product?.priceRangeV2?.minVariantPrice?.amount;
+
+        const variant = json.data?.product?.variants?.nodes?.[0];
+        const collections = json.data?.product?.collections?.nodes?.map(n => n.id) || [];
+
+        if (variant) {
+            return {
+                price: variant.price,
+                compareAtPrice: variant.compareAtPrice,
+                collections
+            };
+        }
+
+        return null;
     } catch (e) {
         console.error("Error fetching price", e);
         return null;

@@ -33,11 +33,15 @@ model Shop {
   shopUrl     String   @unique
   accessToken String?  // Optional because sometimes we might just want to track the shop
   isActive      Boolean  @default(false)
+  maxRounds     Int      @default(3)
+  strategy      String   @default("moderate") // 'aggressive', 'moderate', 'conciliatory'
+  allowSaleItems Boolean @default(true)
   priceRounding Float    @default(0.85)
   botWelcomeMsg String   @default("Bonjour ! 👋 Je peux vous faire une remise si vous me proposez un prix raisonnable. Quel est votre prix ?")
   botRejectMsg  String   @default("C'est un peu juste... Je peux vous le faire à {price} €.")
   botSuccessMsg String   @default("C'est d'accord pour {price}€ ! 🎉")
   widgetColor   String   @default("#000000")
+  botIcon       String?
   rules         Rule[]
   offers      Offer[]
   createdAt   DateTime @default(now())

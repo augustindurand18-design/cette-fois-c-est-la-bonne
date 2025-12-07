@@ -23,6 +23,7 @@ export default function App() {
             Tableau de Bord
           </a>
           <a href="/app/rules">Règles</a>
+          <a href="/app/products">Produits</a>
           <a href="/app/customization">Personnalisation</a>
         </ui-nav-menu>
         <Outlet />

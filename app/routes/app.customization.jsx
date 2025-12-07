@@ -10,6 +10,9 @@ import {
     Select,
     TextField,
     FormLayout,
+    Thumbnail,
+    Button,
+    DropZone,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
@@ -24,6 +27,7 @@ export const loader = async ({ request }) => {
             botRejectMsg: "",
             botSuccessMsg: "",
             widgetColor: "#000000",
+            botIcon: "",
         };
     }
 
@@ -32,6 +36,7 @@ export const loader = async ({ request }) => {
         botRejectMsg: shop.botRejectMsg,
         botSuccessMsg: shop.botSuccessMsg,
         widgetColor: shop.widgetColor,
+        botIcon: shop.botIcon,
     };
 };
 
@@ -43,6 +48,7 @@ export const action = async ({ request }) => {
     const botRejectMsg = formData.get("botRejectMsg");
     const botSuccessMsg = formData.get("botSuccessMsg");
     const widgetColor = formData.get("widgetColor");
+    const botIcon = formData.get("botIcon");
 
     await db.shop.update({
         where: { shopUrl: session.shop },
@@ -50,7 +56,9 @@ export const action = async ({ request }) => {
             botWelcomeMsg,
             botRejectMsg,
             botSuccessMsg,
+            botSuccessMsg,
             widgetColor,
+            botIcon,
         },
     });
 
@@ -97,6 +105,7 @@ export default function CustomizationPage() {
     const [rejectMsg, setRejectMsg] = useState(initialReject);
     const [successMsg, setSuccessMsg] = useState(initialSuccess);
     const [color, setColor] = useState(loaderData.widgetColor || "#000000");
+    const [botIcon, setBotIcon] = useState(loaderData.botIcon || "");
 
     // Detect Tone
     const [tone, setTone] = useState(() => {
@@ -111,6 +120,22 @@ export default function CustomizationPage() {
         }
         return "custom";
     });
+    const [file, setFile] = useState(null);
+
+    const handleDrop = useCallback(
+        (_droppedFiles, acceptedFiles, _rejectedFiles) => {
+            const file = acceptedFiles[0];
+            if (file) {
+                setFile(file);
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setBotIcon(reader.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        },
+        [],
+    );
 
     const handleToneChange = (newTone) => {
         setTone(newTone);
@@ -127,7 +152,9 @@ export default function CustomizationPage() {
                 botWelcomeMsg: welcomeMsg,
                 botRejectMsg: rejectMsg,
                 botSuccessMsg: successMsg,
-                widgetColor: color
+                botSuccessMsg: successMsg,
+                widgetColor: color,
+                botIcon: botIcon
             },
             { method: "POST" }
         );
@@ -148,138 +175,194 @@ export default function CustomizationPage() {
                         <BlockStack gap="400">
                             <Text as="h2" variant="headingMd">Personnalisation du Bot</Text>
 
-                            <Select
-                                label="Ton de la conversation"
-                                options={[
-                                    { label: 'Personnalisé', value: 'custom' },
-                                    { label: 'Standard', value: 'standard' },
-                                    { label: 'Amical / Sympa', value: 'friendly' },
-                                    { label: 'Professionnel', value: 'professional' },
-                                    { label: 'Direct / Minimaliste', value: 'minimalist' },
-                                ]}
-                                onChange={handleToneChange}
-                                value={tone}
-                                helpText="Sélectionnez un style pour pré-remplir les messages ci-dessous."
-                            />
+                            {/* Visuals Section (Top) */}
+                            <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginBottom: "2rem" }}>
 
-                            <FormLayout>
-                                <Text variant="headingSm" as="h6">Couleur du Widget</Text>
-                                <div style={{ display: "flex", alignItems: "end", gap: "10px", marginBottom: "1rem" }}>
-                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px" }}>
-                                        <div
-                                            style={{
-                                                width: "50px",
-                                                height: "50px",
-                                                borderRadius: "8px",
-                                                backgroundColor: color,
-                                                border: "2px solid #ddd",
-                                                cursor: "pointer",
-                                                boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center"
-                                            }}
-                                            onClick={() => document.getElementById("native-color-picker").click()}
-                                            title="Cliquer pour changer la couleur"
-                                        >
-                                            <span style={{ fontSize: "20px", filter: "drop-shadow(0 0 2px rgba(255,255,255,0.8))" }}>🎨</span>
+                                {/* Left Column: Controls (Color + Photo) */}
+                                <div style={{ flex: "1 1 300px" }}>
+                                    <FormLayout>
+                                        <Text variant="headingSm" as="h6">Couleur du Widget</Text>
+                                        <div style={{ display: "flex", alignItems: "end", gap: "10px", marginBottom: "1rem" }}>
+                                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px" }}>
+                                                <div
+                                                    style={{
+                                                        width: "50px",
+                                                        height: "50px",
+                                                        borderRadius: "8px",
+                                                        backgroundColor: color,
+                                                        border: "2px solid #ddd",
+                                                        cursor: "pointer",
+                                                        boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        justifyContent: "center"
+                                                    }}
+                                                    onClick={() => document.getElementById("native-color-picker").click()}
+                                                    title="Cliquer pour changer la couleur"
+                                                >
+                                                    <span style={{ fontSize: "20px", filter: "drop-shadow(0 0 2px rgba(255,255,255,0.8))" }}>🎨</span>
+                                                </div>
+                                                <Text variant="bodyXs" tone="subdued">Cliquer</Text>
+                                            </div>
+
+                                            <input
+                                                type="color"
+                                                id="native-color-picker"
+                                                value={color}
+                                                onChange={(e) => setColor(e.target.value)}
+                                                style={{ visibility: "hidden", position: "absolute", width: 0, height: 0 }}
+                                            />
+                                            <div style={{ flexGrow: 1 }}>
+                                                <TextField
+                                                    label="Code Hex"
+                                                    value={color}
+                                                    onChange={setColor}
+                                                    autoComplete="off"
+                                                    placeholder="#000000"
+                                                    helpText="Ou entrez le code couleur manuellement."
+                                                />
+                                            </div>
                                         </div>
-                                        <Text variant="bodyXs" tone="subdued">Cliquer</Text>
-                                    </div>
 
-                                    <input
-                                        type="color"
-                                        id="native-color-picker"
-                                        value={color}
-                                        onChange={(e) => setColor(e.target.value)}
-                                        style={{ visibility: "hidden", position: "absolute", width: 0, height: 0 }}
-                                    />
-                                    <div style={{ flexGrow: 1 }}>
-                                        <TextField
-                                            label="Code Hex"
-                                            value={color}
-                                            onChange={setColor}
-                                            autoComplete="off"
-                                            placeholder="#000000"
-                                            helpText="Ou entrez le code couleur manuellement."
-                                        />
-                                    </div>
+                                        <div style={{ marginBottom: "1rem" }}>
+                                            <Text variant="headingSm" as="h6">Photo de Profil du Bot</Text>
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginTop: '0.5rem' }}>
+                                                {botIcon && (
+                                                    <div style={{ flexShrink: 0 }}>
+                                                        <Thumbnail
+                                                            source={botIcon}
+                                                            alt="Bot Icon"
+                                                            size="medium"
+                                                        />
+                                                    </div>
+                                                )}
+                                                <div style={{ flexGrow: 1 }}>
+                                                    <BlockStack gap="200">
+                                                        <DropZone onDrop={handleDrop} accept="image/*" type="image" allowMultiple={false} label="Télécharger une image">
+                                                            {(!botIcon && !file) && <DropZone.FileUpload />}
+                                                        </DropZone>
+                                                        <TextField
+                                                            label="Ou coller une URL"
+                                                            value={botIcon}
+                                                            onChange={setBotIcon}
+                                                            autoComplete="off"
+                                                            placeholder="https://..."
+                                                            helpText="Lien direct vers une image."
+                                                        />
+                                                    </BlockStack>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </FormLayout>
                                 </div>
 
-                                {/* Preview Box */}
-                                <Box paddingBlockEnd="400">
-                                    <Text variant="headingSm" as="h6">Aperçu du Chat</Text>
-                                    <div style={{
-                                        border: "1px solid #e1e3e5",
-                                        borderRadius: "12px",
-                                        overflow: "hidden",
-                                        maxWidth: "350px",
-                                        margin: "10px 0",
-                                        fontFamily: '-apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif'
-                                    }}>
-                                        {/* Header */}
+                                {/* Right Column: Preview */}
+                                <div style={{ flex: "1 1 300px" }}>
+                                    <Box paddingBlockEnd="400">
+                                        <Text variant="headingSm" as="h6">Aperçu du Chat</Text>
                                         <div style={{
-                                            backgroundColor: color,
-                                            color: "#fff",
-                                            padding: "12px 16px",
-                                            fontWeight: "600",
-                                            display: "flex",
-                                            justifyContent: "space-between",
-                                            alignItems: "center"
+                                            border: "1px solid #e1e3e5",
+                                            borderRadius: "12px",
+                                            overflow: "hidden",
+                                            maxWidth: "350px",
+                                            margin: "10px 0",
+                                            fontFamily: '-apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif'
                                         }}>
-                                            <span>Négociation en direct</span>
-                                            <span>✕</span>
-                                        </div>
-                                        {/* Body */}
-                                        <div style={{
-                                            backgroundColor: "#fff",
-                                            padding: "16px",
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            gap: "12px",
-                                            minHeight: "150px"
-                                        }}>
-                                            {/* Bot Msg */}
+                                            {/* Header */}
                                             <div style={{
-                                                alignSelf: "flex-start",
-                                                backgroundColor: "#f1f1f1",
-                                                color: "#000",
-                                                padding: "10px 14px",
-                                                borderRadius: "18px 18px 18px 4px",
-                                                maxWidth: "85%",
-                                                fontSize: "14px",
-                                                lineHeight: "1.4"
-                                            }}>
-                                                {welcomeMsg || "Bonjour ! 👋"}
-                                            </div>
-                                            {/* User Msg */}
-                                            <div style={{
-                                                alignSelf: "flex-end",
-                                                backgroundColor: "#007AFF",
+                                                backgroundColor: color,
                                                 color: "#fff",
-                                                padding: "10px 14px",
-                                                borderRadius: "18px 18px 4px 18px",
-                                                maxWidth: "85%",
-                                                fontSize: "14px"
+                                                padding: "12px 16px",
+                                                fontWeight: "600",
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "center"
                                             }}>
-                                                85 €
+                                                <span>Négociation en direct</span>
+                                                <span>✕</span>
                                             </div>
-                                            {/* Bot Logic */}
+                                            {/* Body */}
                                             <div style={{
-                                                alignSelf: "flex-start",
-                                                backgroundColor: "#f1f1f1",
-                                                color: "#000",
-                                                padding: "10px 14px",
-                                                borderRadius: "18px 18px 18px 4px",
-                                                maxWidth: "85%",
-                                                fontSize: "14px",
-                                                lineHeight: "1.4"
+                                                backgroundColor: "#fff",
+                                                padding: "16px",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                gap: "12px",
+                                                minHeight: "150px"
                                             }}>
-                                                {rejectMsg ? rejectMsg.replace("{price}", "90.00") : "Je peux faire 90.00 €."}
+                                                {/* Bot Msg */}
+                                                <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
+                                                    {botIcon && (
+                                                        <div style={{
+                                                            width: "24px",
+                                                            height: "24px",
+                                                            borderRadius: "50%",
+                                                            overflow: "hidden",
+                                                            flexShrink: 0,
+                                                            backgroundImage: `url(${botIcon})`,
+                                                            backgroundSize: "cover",
+                                                            backgroundPosition: "center"
+                                                        }} />
+                                                    )}
+                                                    <div style={{
+                                                        alignSelf: "flex-start",
+                                                        backgroundColor: "#f1f1f1",
+                                                        color: "#000",
+                                                        padding: "10px 14px",
+                                                        borderRadius: "18px 18px 18px 4px",
+                                                        maxWidth: "85%",
+                                                        fontSize: "14px",
+                                                        lineHeight: "1.4"
+                                                    }}>
+                                                        {welcomeMsg || "Bonjour ! 👋"}
+                                                    </div>
+                                                </div>
+                                                {/* User Msg */}
+                                                <div style={{
+                                                    alignSelf: "flex-end",
+                                                    backgroundColor: color,
+                                                    color: "#fff",
+                                                    padding: "10px 14px",
+                                                    borderRadius: "18px 18px 4px 18px",
+                                                    maxWidth: "85%",
+                                                    fontSize: "14px"
+                                                }}>
+                                                    85 €
+                                                </div>
+                                                {/* Bot Logic */}
+                                                <div style={{
+                                                    alignSelf: "flex-start",
+                                                    backgroundColor: "#f1f1f1",
+                                                    color: "#000",
+                                                    padding: "10px 14px",
+                                                    borderRadius: "18px 18px 18px 4px",
+                                                    maxWidth: "85%",
+                                                    fontSize: "14px",
+                                                    lineHeight: "1.4"
+                                                }}>
+                                                    {rejectMsg ? rejectMsg.replace("{price}", "90.00") : "Je peux faire 90.00 €."}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </Box>
+                                    </Box>
+                                </div>
+                            </div>
+
+                            {/* Content Section (Bottom) */}
+                            <FormLayout>
+                                <Select
+                                    label="Ton de la conversation"
+                                    options={[
+                                        { label: 'Personnalisé', value: 'custom' },
+                                        { label: 'Standard', value: 'standard' },
+                                        { label: 'Amical / Sympa', value: 'friendly' },
+                                        { label: 'Professionnel', value: 'professional' },
+                                        { label: 'Direct / Minimaliste', value: 'minimalist' },
+                                    ]}
+                                    onChange={handleToneChange}
+                                    value={tone}
+                                    helpText="Sélectionnez un style pour pré-remplir les messages ci-dessous."
+                                />
 
                                 <TextField
                                     label="Message de Bienvenue"

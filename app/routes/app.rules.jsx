@@ -4,12 +4,14 @@ import {
     Page,
     Layout,
     Card,
-    RangeSlider,
     Text,
     BlockStack,
+    Select,
+    Checkbox,
     Box,
     Banner,
-    Select,
+    InlineStack,
+    Button
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
@@ -20,84 +22,82 @@ export const loader = async ({ request }) => {
 
     const shop = await db.shop.findUnique({
         where: { shopUrl },
-        include: { rules: true },
     });
 
     if (!shop) {
-        return { minDiscount: 0.8, priceRounding: 0.85 };
+        return {
+            priceRounding: 0.85,
+            isActive: false,
+            maxRounds: 3,
+            strategy: "moderate",
+            allowSaleItems: true
+        };
     }
 
-    const globalRule = shop.rules.find((r) => !r.collectionId && !r.productId);
-    const minDiscount = globalRule ? globalRule.minDiscount : 0.8;
-
     return {
-        minDiscount,
         priceRounding: shop.priceRounding !== undefined ? shop.priceRounding : 0.85,
+        isActive: shop.isActive,
+        maxRounds: shop.maxRounds,
+        strategy: shop.strategy,
+        allowSaleItems: shop.allowSaleItems
     };
 };
 
 export const action = async ({ request }) => {
     const { session } = await authenticate.admin(request);
     const formData = await request.formData();
-
-    const minDiscount = parseFloat(formData.get("minDiscount"));
-    const priceRounding = parseFloat(formData.get("priceRounding"));
-
+    const actionType = formData.get("actionType");
     const shop = await db.shop.findUnique({ where: { shopUrl: session.shop } });
 
-    // Update Shop Rounding
-    await db.shop.update({
-        where: { id: shop.id },
-        data: { priceRounding: !isNaN(priceRounding) ? priceRounding : 0.85 },
-    });
+    if (actionType === "saveSettings") {
+        const priceRounding = parseFloat(formData.get("priceRounding"));
+        const isActive = formData.get("isActive") === "true";
+        const maxRounds = parseInt(formData.get("maxRounds"), 10);
+        const strategy = formData.get("strategy");
+        const allowSaleItems = formData.get("allowSaleItems") === "true";
 
-    // Update Global Rule
-    const existingRule = await db.rule.findFirst({
-        where: { shopId: shop.id, collectionId: null, productId: null },
-    });
-
-    if (existingRule) {
-        await db.rule.update({
-            where: { id: existingRule.id },
-            data: { minDiscount },
-        });
-    } else {
-        await db.rule.create({
+        await db.shop.update({
+            where: { id: shop.id },
             data: {
-                shopId: shop.id,
-                minDiscount,
+                priceRounding: !isNaN(priceRounding) ? priceRounding : 0.85,
+                isActive,
+                maxRounds: !isNaN(maxRounds) ? maxRounds : 3,
+                strategy,
+                allowSaleItems
             },
         });
+
+        return { success: true };
     }
 
-    return { success: true };
+    return { success: false };
 };
 
 export default function RulesPage() {
     const loaderData = useLoaderData();
     const fetcher = useFetcher();
 
-    const [discountValue, setDiscountValue] = useState(Math.round((1 - loaderData.minDiscount) * 100));
     const [rounding, setRounding] = useState(loaderData.priceRounding ? loaderData.priceRounding.toString() : "0.85");
-
-    const handleSliderChange = (value) => setDiscountValue(value);
-    const handleTrendingChange = (value) => setRounding(value);
+    const [isActive, setIsActive] = useState(loaderData.isActive);
+    const [maxRounds, setMaxRounds] = useState(loaderData.maxRounds.toString());
+    const [strategy, setStrategy] = useState(loaderData.strategy);
+    const [allowSaleItems, setAllowSaleItems] = useState(loaderData.allowSaleItems);
 
     const handleSave = () => {
-        const newMinDiscount = 1 - (discountValue / 100);
-        fetcher.submit(
-            {
-                minDiscount: newMinDiscount.toString(),
-                priceRounding: rounding,
-            },
-            { method: "POST" }
-        );
+        fetcher.submit({
+            actionType: "saveSettings",
+            priceRounding: rounding,
+            isActive: isActive.toString(),
+            maxRounds: maxRounds,
+            strategy: strategy,
+            allowSaleItems: allowSaleItems.toString()
+        }, { method: "POST" });
     };
 
     return (
         <Page
-            title="Règles de Négociation"
-            subtitle="Définissez les limites et comportements de votre bot."
+            title="Règles & Paramètres"
+            subtitle="Configuration générale du comportement du bot."
             primaryAction={{
                 content: fetcher.state !== "idle" ? "Enregistrement..." : "Enregistrer",
                 onAction: handleSave,
@@ -107,22 +107,67 @@ export default function RulesPage() {
                 <Layout.Section>
                     <Card>
                         <BlockStack gap="400">
-                            <Text as="h2" variant="headingMd">Règles Globales</Text>
-
-                            <Box paddingBlockStart="200">
-                                <Text variant="bodyMd" fontWeight="semibold">Rabais Maximum Autorisé: {discountValue}%</Text>
-                                <RangeSlider
-                                    output
-                                    label="Le bot n'acceptera pas d'offres en dessous de ce seuil."
-                                    min={0}
-                                    max={50}
-                                    step={1}
-                                    value={discountValue}
-                                    onChange={handleSliderChange}
-                                    suffix={`${discountValue}%`}
-                                />
+                            <InlineStack align="space-between" blockAlign="center">
+                                <Text as="h2" variant="headingMd">Activation</Text>
+                                <Button
+                                    variant={isActive ? "primary" : "secondary"}
+                                    tone={isActive ? "success" : "critical"}
+                                    onClick={() => setIsActive(!isActive)}
+                                >
+                                    {isActive ? "Bot Actif" : "Bot Inactif"}
+                                </Button>
+                            </InlineStack>
+                            <Box>
+                                <Text tone="subdued">
+                                    {isActive
+                                        ? "Le bot est actif et interagit avec vos clients pour négocier."
+                                        : "Le bot est désactivé. Le widget n'apparaîtra pas sur votre boutique."
+                                    }
+                                </Text>
                             </Box>
+                        </BlockStack>
+                    </Card>
 
+                    <Card>
+                        <BlockStack gap="400">
+                            <Text as="h2" variant="headingMd">Comportement</Text>
+
+                            <Select
+                                label="Nombre de tours de négociation"
+                                options={[
+                                    { label: '1 (Offre unique)', value: '1' },
+                                    { label: '3 (Classique)', value: '3' },
+                                    { label: '5 (Longue négociation)', value: '5' },
+                                ]}
+                                onChange={setMaxRounds}
+                                value={maxRounds}
+                                helpText="Nombre maximum de contre-propositions que le bot peut faire."
+                            />
+
+                            <Select
+                                label="Stratégie de concession"
+                                options={[
+                                    { label: 'Conciliant (Lâche prise rapidement)', value: 'conciliatory' },
+                                    { label: 'Modéré (Équilibré)', value: 'moderate' },
+                                    { label: 'Ferme (Lâche prise difficilement)', value: 'aggressive' },
+                                ]}
+                                onChange={setStrategy}
+                                value={strategy}
+                                helpText="Défaut: Modéré"
+                            />
+
+                            <Checkbox
+                                label="Autoriser la négociation sur les produits soldés"
+                                checked={allowSaleItems}
+                                onChange={setAllowSaleItems}
+                                helpText="Si décoché, le bot refusera de négocier si le produit a déjà un prix comparateur."
+                            />
+                        </BlockStack>
+                    </Card>
+
+                    <Card>
+                        <BlockStack gap="400">
+                            <Text as="h2" variant="headingMd">Prix & Arrondis</Text>
                             <Select
                                 label="Arrondi des contre-offres (.XX)"
                                 options={[
@@ -133,23 +178,9 @@ export default function RulesPage() {
                                     { label: '.50', value: '0.50' },
                                     { label: '.00 (Rond)', value: '0.00' },
                                 ]}
-                                onChange={handleTrendingChange}
+                                onChange={setRounding}
                                 value={rounding}
                             />
-
-                            <Banner title="Information" tone="info">
-                                Le bot acceptera toute offre supérieure ou égale à {100 - discountValue}% du prix initial.
-                            </Banner>
-                        </BlockStack>
-                    </Card>
-                </Layout.Section>
-
-                <Layout.Section>
-                    {/* Placeholder for future product/collection rules */}
-                    <Card>
-                        <BlockStack gap="200">
-                            <Text variant="headingMd">Règles Spécifiques (Bientôt)</Text>
-                            <Text tone="subdued">Vous pourrez bientôt définir des remises différentes pour certaines collections ou produits.</Text>
                         </BlockStack>
                     </Card>
                 </Layout.Section>
