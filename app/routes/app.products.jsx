@@ -14,9 +14,16 @@ import {
     RangeSlider,
     TextField,
     Badge,
+    Frame,
+    Toast,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { useEffect } from "react";
+import crypto from "crypto";
+
+// Wait, I must use multi_replace or specific target.
+// Let's do imports first.
 
 export const loader = async ({ request }) => {
     const { session, admin } = await authenticate.admin(request);
@@ -27,7 +34,11 @@ export const loader = async ({ request }) => {
         include: { rules: true },
     });
 
+    console.log("[LOADER] Shop URL:", shopUrl);
+    console.log("[LOADER] Shop found:", !!shop);
+
     if (!shop) {
+        console.log("[LOADER] Shop not found, returning empty rules.");
         return { rules: [] };
     }
 
@@ -141,9 +152,40 @@ export const action = async ({ request }) => {
         return { success: true };
     }
 
+    if (actionType === "deleteRule") {
+        const ruleId = formData.get("ruleId");
+        await db.rule.delete({ where: { id: ruleId } });
+        return { success: true };
+    }
+
     if (actionType === "addRule") {
         const resourceId = formData.get("resourceId");
         const type = formData.get("type"); // 'product' or 'collection'
+
+        console.log("[ACTION] Adding Rule. Resource:", resourceId, "Type:", type);
+        console.log("[ACTION] Session Shop:", session.shop);
+        console.log("[ACTION] DB Shop found:", !!shop);
+
+        if (!shop) {
+            console.log("[ACTION] Shop not found in DB. Creating new shop record...");
+            // Auto-create shop if missing
+            try {
+                shop = await db.shop.create({
+                    data: {
+                        id: crypto.randomUUID(),
+                        shopUrl: session.shop,
+                        isActive: true // Auto-activate on manual rule creation
+                    }
+                });
+                console.log("[ACTION] Created new shop:", shop.id);
+            } catch (e) {
+                console.error("[ACTION] Failed to create shop:", e);
+                return { success: false, message: `Erreur création: ${e.message}` };
+            }
+        }
+
+        // Ensure shop is valid now
+        if (!shop) return { success: false, message: "Impossible de récupérer la boutique" };
 
         const existing = await db.rule.findFirst({
             where: {
@@ -153,7 +195,8 @@ export const action = async ({ request }) => {
         });
 
         if (!existing) {
-            await db.rule.create({
+            console.log("[ACTION] Creating new rule for shop ID:", shop.id);
+            const newRule = await db.rule.create({
                 data: {
                     shopId: shop.id,
                     [type === 'product' ? 'productId' : 'collectionId']: resourceId,
@@ -161,14 +204,12 @@ export const action = async ({ request }) => {
                     isEnabled: true
                 }
             });
+            console.log("[ACTION] Rule created ID:", newRule.id);
+            return { success: true, message: "Règle ajoutée avec succès" };
+        } else {
+            console.log("[ACTION] Rule already exists.");
+            return { success: false, message: "Cette règle existe déjà" };
         }
-        return { success: true };
-    }
-
-    if (actionType === "deleteRule") {
-        const ruleId = formData.get("ruleId");
-        await db.rule.delete({ where: { id: ruleId } });
-        return { success: true };
     }
 
     return { success: false };
@@ -177,6 +218,25 @@ export const action = async ({ request }) => {
 export default function ProductsPage() {
     const loaderData = useLoaderData();
     const fetcher = useFetcher();
+
+    // Toast State
+    const [toastActive, setToastActive] = useState(false);
+    const [toastMessage, setToastMessage] = useState("");
+    const [toastError, setToastError] = useState(false);
+
+    useEffect(() => {
+        if (fetcher.data && fetcher.state === "idle" && fetcher.data.message) {
+            setToastMessage(fetcher.data.message);
+            setToastError(!fetcher.data.success);
+            setToastActive(true);
+        }
+    }, [fetcher.data, fetcher.state]);
+
+    const toggleToast = () => setToastActive((active) => !active);
+
+    const toastMarkup = toastActive ? (
+        <Toast content={toastMessage} onDismiss={toggleToast} error={toastError} />
+    ) : null;
 
     const [searchTerm, setSearchTerm] = useState("");
 
@@ -254,113 +314,116 @@ export default function ProductsPage() {
     );
 
     return (
-        <Page
-            title="Produits & Collections"
-            subtitle="Gérez les rabais pour des produits ou collections spécifiques."
-            primaryAction={{
-                content: fetcher.state !== "idle" ? "Enregistrement..." : "Enregistrer",
-                onAction: handleSave,
-            }}
-        >
-            <Layout>
-                <Layout.Section>
-                    <Card>
-                        <BlockStack gap="400">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                                <Text variant="headingMd">Règles Spécifiques</Text>
-                                <InlineStack gap="200">
-                                    <Button onClick={handleAddProduct}>Ajouter Produit</Button>
-                                    <Button onClick={handleAddCollection}>Ajouter Collection</Button>
-                                </InlineStack>
-                            </div>
-
-                            <TextField
-                                label="Rechercher"
-                                value={searchTerm}
-                                onChange={setSearchTerm}
-                                autoComplete="off"
-                                placeholder="Nom du produit ou collection..."
-                                labelHidden
-                                prefix="🔍"
-                            />
-
-                            {filteredRules.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '20px', color: '#6d7175' }}>
-                                    <Text>{searchTerm ? "Aucun résultat trouvé." : "Aucune règle définie. Ajoutez un produit ou une collection."}</Text>
+        <Frame>
+            {toastMarkup}
+            <Page
+                title="Produits & Collections"
+                subtitle="Gérez les rabais pour des produits ou collections spécifiques."
+                primaryAction={{
+                    content: fetcher.state !== "idle" ? "Enregistrement..." : "Enregistrer",
+                    onAction: handleSave,
+                }}
+            >
+                <Layout>
+                    <Layout.Section>
+                        <Card>
+                            <BlockStack gap="400">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                    <Text variant="headingMd">Règles Spécifiques ({loaderData.rules.length})</Text>
+                                    <InlineStack gap="200">
+                                        <Button onClick={handleAddProduct}>Ajouter Produit</Button>
+                                        <Button onClick={handleAddCollection}>Ajouter Collection</Button>
+                                    </InlineStack>
                                 </div>
-                            ) : (
-                                <ResourceList
-                                    resourceName={{ singular: 'règle', plural: 'règles' }}
-                                    items={filteredRules}
-                                    renderItem={(item) => {
-                                        const discountPercent = specificRuleValues[item.id] !== undefined
-                                            ? specificRuleValues[item.id]
-                                            : Math.round((1 - item.minDiscount) * 100);
 
-                                        const isEnabled = item.isEnabled !== false; // Default true if undefined
-
-                                        let minPriceDisplay = null;
-                                        if (item.price) {
-                                            const originalMs = parseFloat(item.price);
-                                            const minPrice = originalMs * (1 - (discountPercent / 100));
-                                            minPriceDisplay = `${minPrice.toFixed(2)} €`;
-                                        }
-
-                                        return (
-                                            <ResourceItem
-                                                id={item.id}
-                                                accessibilityLabel={`Modifier la règle pour ${item.title}`}
-                                                media={
-                                                    <Avatar customer size="medium" name={item.title} source={item.imageUrl} />
-                                                }
-                                                shortcutActions={[
-                                                    {
-                                                        content: isEnabled ? 'Désactiver' : 'Activer',
-                                                        onAction: () => handleToggleRule(item.id, isEnabled)
-                                                    },
-                                                    {
-                                                        content: 'Supprimer',
-                                                        destructive: true,
-                                                        onAction: () => handleDeleteRule(item.id)
-                                                    }
-                                                ]}
-                                                persistActions
-                                            >
-                                                <BlockStack gap="200">
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        <Text variant="bodyMd" fontWeight="bold">{item.title}</Text>
-                                                        <Badge tone={isEnabled ? "success" : "critical"}>
-                                                            {isEnabled ? "Activé" : "Désactivé"}
-                                                        </Badge>
-                                                    </div>
-
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                        <Text variant="bodySm">Rabais Max: {discountPercent}%</Text>
-                                                        {minPriceDisplay && (
-                                                            <Text variant="bodyXs" tone="subdued">Prix Min: {minPriceDisplay}</Text>
-                                                        )}
-                                                    </div>
-
-                                                    <RangeSlider
-                                                        output
-                                                        min={0}
-                                                        max={80}
-                                                        step={1}
-                                                        value={discountPercent}
-                                                        onChange={(v) => handleSpecificSliderChange(item.id, v)}
-                                                        disabled={!isEnabled}
-                                                        suffix={`${discountPercent}%`}
-                                                    />
-                                                </BlockStack>
-                                            </ResourceItem>
-                                        );
-                                    }}
+                                <TextField
+                                    label="Rechercher"
+                                    value={searchTerm}
+                                    onChange={setSearchTerm}
+                                    autoComplete="off"
+                                    placeholder="Nom du produit ou collection..."
+                                    labelHidden
+                                    prefix="🔍"
                                 />
-                            )}
-                        </BlockStack>
-                    </Card>
-                </Layout.Section>
-            </Layout>
-        </Page>
+
+                                {filteredRules.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '20px', color: '#6d7175' }}>
+                                        <Text>{searchTerm ? "Aucun résultat trouvé." : "Aucune règle définie. Ajoutez un produit ou une collection."}</Text>
+                                    </div>
+                                ) : (
+                                    <ResourceList
+                                        resourceName={{ singular: 'règle', plural: 'règles' }}
+                                        items={filteredRules}
+                                        renderItem={(item) => {
+                                            const discountPercent = specificRuleValues[item.id] !== undefined
+                                                ? specificRuleValues[item.id]
+                                                : Math.round((1 - item.minDiscount) * 100);
+
+                                            const isEnabled = item.isEnabled !== false; // Default true if undefined
+
+                                            let priceInfo = null;
+                                            if (item.price) {
+                                                const originalMs = parseFloat(item.price);
+                                                const minPrice = originalMs * (1 - (discountPercent / 100));
+                                                priceInfo = `Base : ${originalMs.toFixed(2)} € | Min : ${minPrice.toFixed(2)} €`;
+                                            }
+
+                                            return (
+                                                <ResourceItem
+                                                    id={item.id}
+                                                    accessibilityLabel={`Modifier la règle pour ${item.title}`}
+                                                    media={
+                                                        <Avatar customer size="medium" name={item.title} source={item.imageUrl} />
+                                                    }
+                                                    shortcutActions={[
+                                                        {
+                                                            content: isEnabled ? 'Désactiver' : 'Activer',
+                                                            onAction: () => handleToggleRule(item.id, isEnabled)
+                                                        },
+                                                        {
+                                                            content: 'Supprimer',
+                                                            destructive: true,
+                                                            onAction: () => handleDeleteRule(item.id)
+                                                        }
+                                                    ]}
+                                                    persistActions
+                                                >
+                                                    <BlockStack gap="200">
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <Text variant="bodyMd" fontWeight="bold">{item.title}</Text>
+                                                            <Badge tone={isEnabled ? "success" : "critical"}>
+                                                                {isEnabled ? "Activé" : "Désactivé"}
+                                                            </Badge>
+                                                        </div>
+
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <Text variant="bodySm">Rabais Max: {discountPercent}%</Text>
+                                                            {priceInfo && (
+                                                                <Text variant="bodyXs" tone="subdued">{priceInfo}</Text>
+                                                            )}
+                                                        </div>
+
+                                                        <RangeSlider
+                                                            output
+                                                            min={0}
+                                                            max={80}
+                                                            step={1}
+                                                            value={discountPercent}
+                                                            onChange={(v) => handleSpecificSliderChange(item.id, v)}
+                                                            disabled={!isEnabled}
+                                                            suffix={`${discountPercent}%`}
+                                                        />
+                                                    </BlockStack>
+                                                </ResourceItem>
+                                            );
+                                        }}
+                                    />
+                                )}
+                            </BlockStack>
+                        </Card>
+                    </Layout.Section>
+                </Layout>
+            </Page>
+        </Frame>
     );
 }
