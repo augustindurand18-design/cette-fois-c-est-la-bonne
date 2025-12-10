@@ -14,25 +14,50 @@ document.addEventListener('DOMContentLoaded', function () {
         widgetColor: "#000000"
     };
 
+    // Helper: Delay function
+    const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
     // Fetch Custom Config
     (async () => {
         try {
-            const res = await fetch(`/apps/negotiate?shop=${window.smartOfferConfig.shopUrl}`);
+            const config = window.smartOfferConfig;
+            const queryParams = new URLSearchParams({
+                shop: config.shopUrl,
+                productId: config.productId,
+                collectionIds: config.collectionIds || ""
+            });
+
+            const res = await fetch(`/apps/negotiate?${queryParams.toString()}`);
             if (res.ok) {
                 const data = await res.json();
                 if (data.botWelcomeMsg) appSettings.botWelcomeMsg = data.botWelcomeMsg;
                 if (data.widgetColor) appSettings.widgetColor = data.widgetColor;
+                if (data.botIcon) appSettings.botIcon = data.botIcon;
 
                 // Apply Styles
-                // btn.style.setProperty("background-color", appSettings.widgetColor, "important");
-                // btn.style.border = "none"; 
-
-
                 const header = document.querySelector(".smart-offer-header");
                 if (header) header.style.backgroundColor = appSettings.widgetColor;
 
-                const submit = document.getElementById("smart-offer-submit");
-                if (submit) submit.style.backgroundColor = appSettings.widgetColor;
+                if (submitBtn && data.widgetColor) {
+                    submitBtn.style.backgroundColor = data.widgetColor;
+                }
+
+                if (data.isEligible && data.isActive) {
+                    btn.style.display = "flex";
+
+                    // Exit Intent Trigger
+                    if (data.enableExitIntent) {
+                        const onMouseLeave = (e) => {
+                            if (e.clientY <= 0) { // Mouse leaves top of viewport
+                                if (modal.style.display !== "block") {
+                                    btn.click(); // Simulate click to open
+                                }
+                                document.removeEventListener("mouseleave", onMouseLeave);
+                            }
+                        };
+                        document.addEventListener("mouseleave", onMouseLeave);
+                    }
+                }
             }
         } catch (e) {
             console.warn("SmartOffer: Could not load config", e);
@@ -43,26 +68,55 @@ document.addEventListener('DOMContentLoaded', function () {
     let isThinking = false;
     let attemptCount = 0;
 
-    // Helpers
     const scrollToBottom = () => {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     };
 
     const addMessage = (text, sender, isHtml = false) => {
+        // Container (Flex row)
         const msgDiv = document.createElement("div");
-        msgDiv.classList.add("smart-offer-message", sender);
-        if (isHtml) msgDiv.innerHTML = text;
-        else msgDiv.innerText = text;
+        msgDiv.classList.add("smart-offer-message-container", sender);
+
+        // Icon (Bot only)
+        if (sender === "bot" && appSettings.botIcon) {
+            const iconImg = document.createElement("img");
+            iconImg.src = appSettings.botIcon;
+            iconImg.classList.add("smart-offer-bot-icon");
+            msgDiv.appendChild(iconImg);
+        }
+
+        // Bubble (The actual text part)
+        const bubble = document.createElement("div");
+        bubble.classList.add("smart-offer-message-bubble", sender);
+
+        if (isHtml) bubble.innerHTML = text;
+        else bubble.innerText = text;
+
+        msgDiv.appendChild(bubble);
+
         messagesContainer.appendChild(msgDiv);
         scrollToBottom();
     };
 
     const addLoading = () => {
-        const loader = document.createElement("div");
-        loader.className = "smart-offer-loading";
-        loader.innerHTML = "<span>.</span><span>.</span><span>.</span>";
-        loader.id = "smart-offer-loading-indicator";
-        messagesContainer.appendChild(loader);
+        const loaderContainer = document.createElement("div");
+        loaderContainer.className = "smart-offer-message-container bot";
+        loaderContainer.id = "smart-offer-loading-indicator";
+
+        if (appSettings.botIcon) {
+            const iconImg = document.createElement("img");
+            iconImg.src = appSettings.botIcon;
+            iconImg.classList.add("smart-offer-bot-icon");
+            loaderContainer.appendChild(iconImg);
+        }
+
+        const bubble = document.createElement("div");
+        // Using special class for typing indicator styling
+        bubble.className = "smart-offer-typing";
+        bubble.innerHTML = "<span></span><span></span><span></span>";
+
+        loaderContainer.appendChild(bubble);
+        messagesContainer.appendChild(loaderContainer);
         scrollToBottom();
     };
 
@@ -72,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     // Open/Close
-    btn.onclick = function () {
+    btn.onclick = async function () {
         modal.style.display = "block";
         if (messagesContainer.children.length === 0) {
             // Add Product Preview
@@ -83,18 +137,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 card.style.display = "flex";
                 card.style.alignItems = "center";
                 card.style.padding = "10px";
-                card.style.marginBottom = "10px";
-                card.style.background = "#f9f9f9";
-                card.style.borderRadius = "8px";
-                card.style.border = "1px solid #ddd";
+                card.style.marginBottom = "16px";
+                card.style.background = "#fff";
+                card.style.borderRadius = "12px";
+                card.style.border = "1px solid #f2f2f7";
+                card.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
 
                 const img = document.createElement("img");
                 img.src = config.productImage;
-                img.style.width = "50px";
-                img.style.height = "50px";
+                img.style.width = "48px";
+                img.style.height = "48px";
                 img.style.objectFit = "cover";
-                img.style.borderRadius = "4px";
-                img.style.marginRight = "10px";
+                img.style.borderRadius = "8px";
+                img.style.marginRight = "12px";
 
                 const info = document.createElement("div");
                 info.style.display = "flex";
@@ -102,13 +157,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const title = document.createElement("span");
                 title.innerText = config.productTitle;
-                title.style.fontWeight = "bold";
-                title.style.fontSize = "0.9em";
+                title.style.fontWeight = "600";
+                title.style.fontSize = "0.95em";
+                title.style.color = "#1c1c1e";
 
                 const price = document.createElement("span");
                 price.innerText = config.productPrice;
-                price.style.fontSize = "0.85em";
-                price.style.color = "#555";
+                price.style.fontSize = "0.9em";
+                price.style.color = "#8e8e93";
 
                 info.appendChild(title);
                 info.appendChild(price);
@@ -124,6 +180,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 messagesContainer.appendChild(cardContainer);
             }
 
+            // Simulate typing for welcome message
+            addLoading();
+            await wait(600);
+            removeLoading();
             addMessage(appSettings.botWelcomeMsg, "bot");
         }
     }
@@ -148,147 +208,204 @@ document.addEventListener('DOMContentLoaded', function () {
         attemptCount++; // Increment attempt
 
         // User Message
-        addMessage(`${price} €`, "user");
+        addMessage(price, "user");
         input.value = "";
 
         isThinking = true;
         submitBtn.disabled = true;
+
+        // Random "thinking" delay for realism (1s to 2s)
+        const thinkingTime = 1000 + Math.random() * 1000;
         addLoading();
 
-        try {
-            const response = await fetch('/apps/negotiate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    productId: window.smartOfferConfig.productId,
-                    offerPrice: price,
-                    shopUrl: window.smartOfferConfig.shopUrl,
-                    round: attemptCount
-                })
+        // Generate or retrieve Session ID for Rate Limiting
+        let sessionId = sessionStorage.getItem("smartOfferSessionId");
+        if (!sessionId) {
+            sessionId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
             });
+            sessionStorage.setItem("smartOfferSessionId", sessionId);
+        }
+
+        try {
+            const [response] = await Promise.all([
+                fetch('/apps/negotiate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        productId: window.smartOfferConfig.productId,
+                        offerPrice: price,
+                        shopUrl: window.smartOfferConfig.shopUrl,
+                        round: attemptCount,
+                        sessionId: sessionId // Send Session ID
+                    })
+                }),
+                wait(thinkingTime) // Ensure we wait at least this long
+            ]);
 
             const data = await response.json();
             removeLoading();
 
             if (response.ok) {
                 if (data.status === 'ACCEPTED') {
+                    // Trigger Confetti
+                    launchConfetti();
+
                     addMessage(data.message || `C'est d'accord pour <b>${price}€</b> ! 🎉`, "bot", true);
 
-                    // Button to add to cart
+                    // Refined Action Button
                     const actionBtn = document.createElement("button");
                     actionBtn.className = "smart-offer-action-btn";
-                    actionBtn.innerText = "Validation de la remise...";
-                    actionBtn.disabled = true;
-                    actionBtn.style.opacity = "0.7";
-                    actionBtn.style.cursor = "not-allowed";
+                    actionBtn.innerText = "Ajouter au panier & payer";
 
                     // Logic to add to cart and redirect
-                    actionBtn.onclick = () => {
-                        actionBtn.innerText = "Redirection...";
+                    actionBtn.onclick = async () => {
+                        actionBtn.innerText = "Ajout en cours...";
                         actionBtn.disabled = true;
+                        actionBtn.style.opacity = "0.8";
 
                         const root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || "/";
-                        fetch(root + 'cart/add.js', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                items: [{
-                                    id: window.smartOfferConfig.variantId,
-                                    quantity: 1
-                                }]
-                            })
-                        })
-                            .then(res => {
-                                if (res.ok) {
-                                    window.location.href = root + `checkout?discount=${data.code}`;
-                                } else {
-                                    actionBtn.innerText = "Erreur (Réessayer)";
-                                    actionBtn.disabled = false;
-                                }
-                            })
-                            .catch(e => {
-                                console.error(e);
-                                actionBtn.innerText = "Erreur";
+
+                        try {
+                            // 1. Add to Cart via AJAX
+                            const addToCartRes = await fetch(root + 'cart/add.js', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    items: [{
+                                        id: window.smartOfferConfig.variantId,
+                                        quantity: 1,
+                                        properties: {
+                                            '_SmartOffer': 'Accepted' // Mark as negotiated item if needed later
+                                        }
+                                    }]
+                                })
                             });
+
+                            if (addToCartRes.ok) {
+                                actionBtn.innerText = "Redirection vers le paiement...";
+                                // 2. Redirect to Checkout with Discount Code
+                                window.location.href = `/discount/${data.code}?redirect=/checkout`;
+                            } else {
+                                throw new Error("Cart add failed");
+                            }
+                        } catch (e) {
+                            console.error(e);
+                            actionBtn.innerText = "Erreur - Réessayer";
+                            actionBtn.disabled = false;
+                            actionBtn.style.opacity = "1";
+                        }
                     };
 
                     // Add button as a specialized message bubble
                     const btnContainer = document.createElement("div");
-                    btnContainer.classList.add("smart-offer-message", "bot");
-                    btnContainer.style.background = "transparent";
-                    btnContainer.style.padding = "0";
-                    btnContainer.appendChild(actionBtn);
+                    btnContainer.classList.add("smart-offer-message-container", "bot");
+
+                    if (appSettings.botIcon) {
+                        const iconImg = document.createElement("img");
+                        iconImg.src = appSettings.botIcon;
+                        iconImg.classList.add("smart-offer-bot-icon");
+                        btnContainer.appendChild(iconImg);
+                    }
+
+                    const bubble = document.createElement("div");
+                    bubble.classList.add("smart-offer-message-bubble", "bot");
+                    bubble.style.background = "transparent";
+                    bubble.style.padding = "0";
+                    bubble.style.boxShadow = "none";
+                    bubble.appendChild(actionBtn);
+
+                    btnContainer.appendChild(bubble);
                     messagesContainer.appendChild(btnContainer);
                     scrollToBottom();
 
-                    // Enable after 2.5s to allow Shopify propagation
-                    setTimeout(() => {
-                        let timeLeft = 120; // 2 minutes
+                    // Countdown logic
+                    let timeLeft = 300; // 5 minutes to create urgency
+                    const originalBtnText = "Ajouter au panier & payer";
 
-                        const updateTimer = () => {
-                            const minutes = Math.floor(timeLeft / 60);
-                            const seconds = timeLeft % 60;
-                            const timeString = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-                            actionBtn.innerText = `Acheter à ${price}€ (Expire dans ${timeString})`;
-                        };
+                    const updateTimer = () => {
+                        const minutes = Math.floor(timeLeft / 60);
+                        const seconds = timeLeft % 60;
+                        const timeString = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                        if (!actionBtn.disabled || actionBtn.innerText.includes("Ajouter")) {
+                            actionBtn.innerText = `${originalBtnText} (${timeString})`;
+                        }
+                    };
+                    updateTimer();
 
-                        actionBtn.disabled = false;
-                        actionBtn.style.opacity = "1";
-                        actionBtn.style.cursor = "pointer";
-                        updateTimer();
+                    const timerInterval = setInterval(() => {
+                        timeLeft--;
+                        if (timeLeft <= 0) {
+                            clearInterval(timerInterval);
+                            actionBtn.innerText = "Offre expirée";
+                            actionBtn.disabled = true;
+                            actionBtn.onclick = null;
+                        } else {
+                            updateTimer();
+                        }
+                    }, 1000);
 
-                        const timerInterval = setInterval(() => {
-                            timeLeft--;
-                            if (timeLeft <= 0) {
-                                clearInterval(timerInterval);
-                                actionBtn.innerText = "Offre expirée";
-                                actionBtn.disabled = true;
-                                actionBtn.style.opacity = "0.7";
-                                actionBtn.style.cursor = "not-allowed";
-                                actionBtn.onclick = null; // Remove click handler
-                            } else {
-                                updateTimer();
-                            }
-                        }, 1000);
-
-                    }, 2500);
 
                     // Disable further input
                     input.disabled = true;
                     submitBtn.style.display = 'none';
 
                 } else if (data.status === 'REJECTED' || data.status === 'COUNTER') {
-                    // The backend returns a specific message or we construct one
-                    // data.message from backend: "Un peu juste... "
+                    // Trigger Shake
+                    const container = document.querySelector('.smart-offer-chat-container');
+                    if (container) {
+                        container.classList.remove('smart-offer-shake');
+                        void container.offsetWidth; // trigger reflow
+                        container.classList.add('smart-offer-shake');
+                        setTimeout(() => container.classList.remove('smart-offer-shake'), 500);
+                    }
+
                     addMessage(data.message || `Hmm, c'est trop bas. Je peux descendre à ${data.counterPrice}€, pas moins.`, "bot");
 
                     if (data.counterPrice) {
                         const acceptBtn = document.createElement("button");
                         acceptBtn.className = "smart-offer-action-btn";
-                        acceptBtn.innerText = `Accepter à ${data.counterPrice} €`;
-                        acceptBtn.style.marginTop = "5px";
-                        acceptBtn.style.fontSize = "0.9em";
+                        acceptBtn.innerText = `Accepter la contre-offre (${data.counterPrice} €)`;
+                        acceptBtn.style.marginTop = "8px";
 
                         acceptBtn.onclick = () => {
                             input.value = data.counterPrice;
                             handleSubmit();
-                            acceptBtn.remove(); // Remove button after clicking to prevent double submit
+                            acceptBtn.remove();
                         };
 
                         const btnContainer = document.createElement("div");
-                        btnContainer.classList.add("smart-offer-message", "bot");
-                        btnContainer.style.background = "transparent";
-                        btnContainer.style.padding = "0";
-                        btnContainer.appendChild(acceptBtn);
+                        btnContainer.classList.add("smart-offer-message-container", "bot");
+                        if (appSettings.botIcon) {
+                            const iconImg = document.createElement("img");
+                            iconImg.src = appSettings.botIcon;
+                            iconImg.classList.add("smart-offer-bot-icon");
+                            btnContainer.appendChild(iconImg);
+                        }
+
+                        const bubble = document.createElement("div");
+                        bubble.classList.add("smart-offer-message-bubble", "bot");
+                        bubble.style.background = "transparent";
+                        bubble.style.padding = "0";
+                        bubble.style.boxShadow = "none";
+                        bubble.appendChild(acceptBtn);
+
+                        btnContainer.appendChild(bubble);
                         messagesContainer.appendChild(btnContainer);
                         scrollToBottom();
                     }
 
+                } else if (data.status === 'CHAT') {
+                    addMessage(data.message, "bot");
+                } else if (data.status === 'ERROR') {
+                    addMessage(data.error || "Une erreur s'est produite.", "bot");
                 } else {
-                    addMessage("Une erreur s'est produite. Essayez encore.", "bot");
+                    addMessage("Une erreur s'est produite.", "bot");
                 }
+
             } else {
-                addMessage("Erreur de connexion. Réessayez plus tard.", "bot");
+                addMessage("Erreur de connexion.", "bot");
             }
 
         } catch (e) {
@@ -312,5 +429,120 @@ document.addEventListener('DOMContentLoaded', function () {
             handleSubmit();
         }
     });
+
+    // Mobile Keyboard Handling: Visual Viewport Binding
+    if (window.visualViewport) {
+        const handleVisualViewportResize = () => {
+            // Only apply fix on mobile screens
+            if (window.innerWidth <= 480) {
+                const container = document.querySelector('.smart-offer-chat-container');
+                if (container) {
+                    // Force height to match the actual visible area
+                    container.style.height = `${window.visualViewport.height}px`;
+
+                    // CRITICAL: Sync top position to viewport offset to handle scroll
+                    // This ensures the fixed container moves with the visual viewport
+                    container.style.top = `${window.visualViewport.offsetTop}px`;
+
+                    // Detect keyboard: if viewport height is significantly less than window innerHeight
+                    if (window.visualViewport.height < window.innerHeight * 0.85) {
+                        container.classList.add('keyboard-open');
+                    } else {
+                        container.classList.remove('keyboard-open');
+                    }
+
+                    setTimeout(scrollToBottom, 50);
+                }
+            } else {
+                // Reset on desktop/larger screens
+                const container = document.querySelector('.smart-offer-chat-container');
+                if (container) {
+                    container.style.height = '';
+                    container.style.top = ''; // Reset top
+                    container.classList.remove('keyboard-open');
+                }
+            }
+        };
+
+        window.visualViewport.addEventListener('resize', handleVisualViewportResize);
+        window.visualViewport.addEventListener('scroll', handleVisualViewportResize);
+
+        // Initial check
+        handleVisualViewportResize();
+    }
+
+    input.addEventListener('focus', () => {
+        // slight delay to ensure keyboard animation is factored in if viewport doesn't fire immediately
+        setTimeout(scrollToBottom, 300);
+    });
+
+    // --- Simple Confetti Implementation ---
+    function launchConfetti() {
+        // Target the container
+        const container = document.querySelector('.smart-offer-chat-container');
+        if (!container) return;
+
+        // Create canvas
+        const canvas = document.createElement('canvas');
+        canvas.style.position = 'absolute'; // Absolute relative to container
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '10'; // Inside container, on top of messages
+        canvas.style.borderRadius = '20px'; // Match container radius
+        container.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const width = container.offsetWidth;
+        const height = container.offsetHeight;
+        canvas.width = width;
+        canvas.height = height;
+
+        const particles = [];
+        const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#00ffff', '#ff00ff', '#ffa500'];
+
+        for (let i = 0; i < 150; i++) {
+            particles.push({
+                x: width / 2, // Start from center width
+                y: height * 0.8, // Start from lower part (near input)
+                vx: (Math.random() - 0.5) * 15, // Explosion spread
+                vy: (Math.random() * -12) - 5, // Upward force
+                color: colors[Math.floor(Math.random() * colors.length)],
+                size: Math.random() * 5 + 3,
+                gravity: 0.4,
+                drag: 0.95
+            });
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let active = false;
+
+            particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += p.gravity;
+                p.vx *= p.drag;
+                p.vy *= p.drag;
+
+                if (p.y < canvas.height + 20 && p.size > 0.1) {
+                    active = true;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            if (active) {
+                requestAnimationFrame(render);
+            } else {
+                canvas.remove();
+            }
+        }
+        render();
+    }
 
 });

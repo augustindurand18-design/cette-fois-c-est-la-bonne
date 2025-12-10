@@ -22,9 +22,6 @@ import db from "../db.server";
 import { useEffect } from "react";
 import crypto from "crypto";
 
-// Wait, I must use multi_replace or specific target.
-// Let's do imports first.
-
 export const loader = async ({ request }) => {
     const { session, admin } = await authenticate.admin(request);
     const shopUrl = session.shop;
@@ -130,14 +127,36 @@ export const action = async ({ request }) => {
     const shop = await db.shop.findUnique({ where: { shopUrl: session.shop } });
 
     if (actionType === "saveRules") {
+        const updates = {};
+
         for (const [key, value] of formData.entries()) {
             if (key.startsWith("rule_")) {
-                const ruleId = key.replace("rule_", "");
-                await db.rule.update({
-                    where: { id: ruleId },
-                    data: { minDiscount: parseFloat(value) }
-                });
+                const parts = key.split('_');
+
+                if (parts.length >= 3) {
+                    const ruleId = parts[1];
+                    const field = parts[2]; // discount | minPrice
+
+                    if (!updates[ruleId]) updates[ruleId] = {};
+
+                    if (field === "discount") {
+                        updates[ruleId].minDiscount = parseFloat(value);
+                    } else if (field === "minPrice") {
+                        updates[ruleId].minPrice = value === "" ? null : parseFloat(value);
+                    }
+                }
             }
+        }
+
+        // Execute updates
+        for (const [ruleId, data] of Object.entries(updates)) {
+            await db.rule.update({
+                where: { id: ruleId },
+                data: {
+                    minDiscount: data.minDiscount,
+                    minPrice: data.minPrice
+                }
+            });
         }
         return { success: true };
     }
@@ -168,7 +187,6 @@ export const action = async ({ request }) => {
 
         if (!shop) {
             console.log("[ACTION] Shop not found in DB. Creating new shop record...");
-            // Auto-create shop if missing
             try {
                 shop = await db.shop.create({
                     data: {
@@ -184,7 +202,6 @@ export const action = async ({ request }) => {
             }
         }
 
-        // Ensure shop is valid now
         if (!shop) return { success: false, message: "Impossible de récupérer la boutique" };
 
         const existing = await db.rule.findFirst({
@@ -240,7 +257,7 @@ export default function ProductsPage() {
 
     const [searchTerm, setSearchTerm] = useState("");
 
-    // Specific Rules State
+    // Specific Rules State: Discount % (0-100)
     const [specificRuleValues, setSpecificRuleValues] = useState(() => {
         const initial = {};
         loaderData.rules.forEach(r => {
@@ -249,19 +266,131 @@ export default function ProductsPage() {
         return initial;
     });
 
-    const handleSpecificSliderChange = (ruleId, value) => {
+    // Specific Rules State: Exact Min Price (Float or null)
+    const [specificPriceValues, setSpecificPriceValues] = useState(() => {
+        const initial = {};
+        loaderData.rules.forEach(r => {
+            initial[r.id] = r.minPrice !== null && r.minPrice !== undefined ? r.minPrice : null;
+        });
+        return initial;
+    });
+
+    const handleSpecificSliderChange = (ruleId, value, originalPrice) => {
         setSpecificRuleValues(prev => ({
             ...prev,
             [ruleId]: value
         }));
+
+        if (originalPrice) {
+            const calculatedPrice = originalPrice * (1 - (value / 100));
+            setSpecificPriceValues(prev => ({
+                ...prev,
+                [ruleId]: calculatedPrice
+            }));
+        } else {
+            setSpecificPriceValues(prev => ({
+                ...prev,
+                [ruleId]: null
+            }));
+        }
+    };
+
+    const handleSpecificPriceChange = (ruleId, newPriceString, originalPrice) => {
+        if (!originalPrice) return;
+
+        // 1. Update State with EXACT string to allow typing (e.g. "12.")
+        // CHANGED: Store empty string directly to avoid fallback logic kicking in
+        setSpecificPriceValues(prev => ({ ...prev, [ruleId]: newPriceString }));
+
+        // 2. Sync Slider (Logic Only)
+        // Parse strictly for calculation
+        const priceCandidate = parseFloat(newPriceString);
+
+        // If invalid number (e.g. empty, "-", "."), skip valid calculation update but keep string in state
+        if (isNaN(priceCandidate)) return;
+
+        // Clamp for discount sync
+        let validPriceForCalc = priceCandidate;
+        if (validPriceForCalc < 0) validPriceForCalc = 0;
+        if (validPriceForCalc > originalPrice) validPriceForCalc = originalPrice;
+
+        let discountPercent = Math.round((1 - (validPriceForCalc / originalPrice)) * 100);
+        if (discountPercent > 80) discountPercent = 80;
+        if (discountPercent < 0) discountPercent = 0;
+
+        setSpecificRuleValues(prev => ({ ...prev, [ruleId]: discountPercent }));
+    };
+
+    // Dirty State Tracking
+    const [isDirty, setIsDirty] = useState(false);
+
+    // Initial Values for Reset
+    const [initialRuleValues, setInitialRuleValues] = useState({});
+    const [initialPriceValues, setInitialPriceValues] = useState({});
+
+    useEffect(() => {
+        // Initialize or Re-initialize when loaderData changes (e.g. after save)
+        const initRules = {};
+        const initPrices = {};
+        loaderData.rules.forEach(r => {
+            initRules[r.id] = Math.round((1 - r.minDiscount) * 100);
+            initPrices[r.id] = r.minPrice !== null && r.minPrice !== undefined ? r.minPrice : null;
+        });
+        setInitialRuleValues(initRules);
+        setInitialPriceValues(initPrices);
+        setIsDirty(false); // Reset dirty state on load/refresh
+    }, [loaderData.rules]);
+
+    // Check for dirty state whenever values change
+    useEffect(() => {
+        let dirty = false;
+        // Compare current specificRuleValues with initial
+        for (const key in specificRuleValues) {
+            if (specificRuleValues[key] !== initialRuleValues[key]) {
+                dirty = true;
+                break;
+            }
+        }
+        // Compare prices
+        if (!dirty) {
+            for (const key in specificPriceValues) {
+                // Handle null/string mismatch roughly (e.g. 120.00 vs 120)
+                // convert both to strings or numbers for comparison if not null
+                const current = specificPriceValues[key];
+                const initial = initialPriceValues[key];
+
+                if (current != initial) { // Loose equality to catch 123 != "123"
+                    // Double check for number parsing equality if both exist
+                    if (current && initial && parseFloat(current) === parseFloat(initial)) {
+                        continue;
+                    }
+                    if ((current === "" && initial === null) || (current === null && initial === "")) continue;
+
+                    dirty = true;
+                    break;
+                }
+            }
+        }
+        setIsDirty(dirty);
+    }, [specificRuleValues, specificPriceValues, initialRuleValues, initialPriceValues]);
+
+    const handleDiscard = () => {
+        setSpecificRuleValues(initialRuleValues);
+        setSpecificPriceValues(initialPriceValues);
+        setIsDirty(false);
     };
 
     const handleSave = () => {
         const data = { actionType: "saveRules" };
-        Object.entries(specificRuleValues).forEach(([ruleId, val]) => {
-            data[`rule_${ruleId}`] = (1 - (val / 100)).toString();
+        Object.keys(specificRuleValues).forEach((ruleId) => {
+            const discountVal = specificRuleValues[ruleId];
+            data[`rule_${ruleId}_discount`] = (1 - (discountVal / 100)).toString();
+
+            const priceVal = specificPriceValues[ruleId];
+            data[`rule_${ruleId}_minPrice`] = (priceVal !== null && priceVal !== undefined) ? priceVal.toString() : "";
         });
         fetcher.submit(data, { method: "POST" });
+        // Optimistically reset dirty logic or wait for loader re-validation (useEffect handles it)
     };
 
     const handleAddProduct = async () => {
@@ -322,6 +451,7 @@ export default function ProductsPage() {
                 primaryAction={{
                     content: fetcher.state !== "idle" ? "Enregistrement..." : "Enregistrer",
                     onAction: handleSave,
+                    disabled: !isDirty || fetcher.state !== "idle",
                 }}
             >
                 <Layout>
@@ -359,13 +489,20 @@ export default function ProductsPage() {
                                                 ? specificRuleValues[item.id]
                                                 : Math.round((1 - item.minDiscount) * 100);
 
-                                            const isEnabled = item.isEnabled !== false; // Default true if undefined
+                                            const isEnabled = item.isEnabled !== false;
 
-                                            let priceInfo = null;
+                                            let originalPrice = null;
                                             if (item.price) {
-                                                const originalMs = parseFloat(item.price);
-                                                const minPrice = originalMs * (1 - (discountPercent / 100));
-                                                priceInfo = `Base : ${originalMs.toFixed(2)} € | Min : ${minPrice.toFixed(2)} €`;
+                                                originalPrice = parseFloat(item.price);
+                                            }
+
+                                            // Determine current min price to display
+                                            let currentMinPrice = specificPriceValues[item.id];
+
+                                            // Fallback logic for display if explicit price not set but original exists
+                                            // NOTE: We do NOT fallback if currentMinPrice is "" (user cleared it explicitly)
+                                            if ((currentMinPrice === null || currentMinPrice === undefined) && originalPrice) {
+                                                currentMinPrice = originalPrice * (1 - (discountPercent / 100));
                                             }
 
                                             return (
@@ -388,7 +525,7 @@ export default function ProductsPage() {
                                                     ]}
                                                     persistActions
                                                 >
-                                                    <BlockStack gap="200">
+                                                    <BlockStack gap="400">
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                             <Text variant="bodyMd" fontWeight="bold">{item.title}</Text>
                                                             <Badge tone={isEnabled ? "success" : "critical"}>
@@ -396,23 +533,41 @@ export default function ProductsPage() {
                                                             </Badge>
                                                         </div>
 
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                            <Text variant="bodySm">Rabais Max: {discountPercent}%</Text>
-                                                            {priceInfo && (
-                                                                <Text variant="bodyXs" tone="subdued">{priceInfo}</Text>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px' }}>
+                                                            <div style={{ flex: 1 }}>
+                                                                <Text variant="bodySm">Rabais Max: {discountPercent}%</Text>
+                                                                <RangeSlider
+                                                                    output
+                                                                    min={0}
+                                                                    max={80}
+                                                                    step={1}
+                                                                    value={discountPercent}
+                                                                    onChange={(v) => handleSpecificSliderChange(item.id, v, originalPrice)}
+                                                                    disabled={!isEnabled}
+                                                                    suffix={`${discountPercent}%`}
+                                                                />
+                                                            </div>
+
+                                                            {item.price && originalPrice && (
+                                                                <div style={{ width: '150px' }}>
+                                                                    <TextField
+                                                                        label="Prix Minimum Accepté"
+                                                                        type="number"
+                                                                        step={0.01}
+                                                                        value={
+                                                                            currentMinPrice !== null && currentMinPrice !== undefined
+                                                                                ? (typeof currentMinPrice === 'number' ? currentMinPrice.toFixed(2) : currentMinPrice)
+                                                                                : ""
+                                                                        }
+                                                                        onChange={(v) => handleSpecificPriceChange(item.id, v, originalPrice)}
+                                                                        prefix="€"
+                                                                        disabled={!isEnabled}
+                                                                        autoComplete="off"
+                                                                        helpText={`Prix de base : ${originalPrice.toFixed(2)} €`}
+                                                                    />
+                                                                </div>
                                                             )}
                                                         </div>
-
-                                                        <RangeSlider
-                                                            output
-                                                            min={0}
-                                                            max={80}
-                                                            step={1}
-                                                            value={discountPercent}
-                                                            onChange={(v) => handleSpecificSliderChange(item.id, v)}
-                                                            disabled={!isEnabled}
-                                                            suffix={`${discountPercent}%`}
-                                                        />
                                                     </BlockStack>
                                                 </ResourceItem>
                                             );

@@ -42,6 +42,7 @@ model Shop {
   botSuccessMsg String   @default("C'est d'accord pour {price}€ ! 🎉")
   widgetColor   String   @default("#000000")
   botIcon       String?
+  enableExitIntent Boolean @default(false)
   rules         Rule[]
   offers      Offer[]
   createdAt   DateTime @default(now())
@@ -54,6 +55,7 @@ model Rule {
   collectionId   String?  // If null, it's a global rule
   productId      String?  // If defined, overrides collection/global
   minDiscount    Float    // e.g., 0.80 for 20% off max
+  minPrice       Float?   // Specific minimum accepted price override
   isEnabled      Boolean  @default(true)
   createdAt      DateTime @default(now())
 }
@@ -63,8 +65,12 @@ model Offer {
   shopId        String
   shop          Shop     @relation(fields: [shopId], references: [id])
   customerEmail String?
+  sessionId     String?  // New: For rate limiting anonymous users
   offeredPrice  Float
   status        String   // ACCEPTED, REJECTED, COUNTER_OFFER
   code          String?  // Generated discount code if accepted
+  productTitle  String?
+  productId     String?
+  originalPrice Float?
   createdAt     DateTime @default(now())
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useFetcher, useLoaderData } from "react-router";
 import {
     Page,
@@ -13,9 +13,11 @@ import {
     Thumbnail,
     Button,
     DropZone,
+    InlineStack,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { useTranslation } from "react-i18next";
 
 export const loader = async ({ request }) => {
     const { session } = await authenticate.admin(request);
@@ -56,7 +58,6 @@ export const action = async ({ request }) => {
             botWelcomeMsg,
             botRejectMsg,
             botSuccessMsg,
-            botSuccessMsg,
             widgetColor,
             botIcon,
         },
@@ -95,6 +96,7 @@ const TONE_PRESETS = {
 export default function CustomizationPage() {
     const loaderData = useLoaderData();
     const fetcher = useFetcher();
+    const { t } = useTranslation();
 
     // Initial Values
     const initialWelcome = loaderData.botWelcomeMsg || TONE_PRESETS.standard.welcome;
@@ -106,6 +108,19 @@ export default function CustomizationPage() {
     const [successMsg, setSuccessMsg] = useState(initialSuccess);
     const [color, setColor] = useState(loaderData.widgetColor || "#000000");
     const [botIcon, setBotIcon] = useState(loaderData.botIcon || "");
+
+    const [isDirty, setIsDirty] = useState(false);
+
+    useEffect(() => {
+        const isModified =
+            welcomeMsg !== initialWelcome ||
+            rejectMsg !== initialReject ||
+            successMsg !== initialSuccess ||
+            color !== (loaderData.widgetColor || "#000000") ||
+            botIcon !== (loaderData.botIcon || "");
+
+        setIsDirty(isModified);
+    }, [welcomeMsg, rejectMsg, successMsg, color, botIcon, initialWelcome, initialReject, initialSuccess, loaderData]);
 
     // Detect Tone
     const [tone, setTone] = useState(() => {
@@ -152,7 +167,6 @@ export default function CustomizationPage() {
                 botWelcomeMsg: welcomeMsg,
                 botRejectMsg: rejectMsg,
                 botSuccessMsg: successMsg,
-                botSuccessMsg: successMsg,
                 widgetColor: color,
                 botIcon: botIcon
             },
@@ -162,18 +176,19 @@ export default function CustomizationPage() {
 
     return (
         <Page
-            title="Personnalisation"
-            subtitle="Gérez l'apparence et le ton de votre bot de négociation."
+            title={t('customization.title')}
+            subtitle={t('customization.subtitle')}
             primaryAction={{
-                content: fetcher.state !== "idle" ? "Enregistrement..." : "Enregistrer",
+                content: fetcher.state !== "idle" ? t('common.saving') : t('common.save'),
                 onAction: handleSave,
+                disabled: !isDirty || fetcher.state !== "idle",
             }}
         >
             <Layout>
                 <Layout.Section>
                     <Card>
                         <BlockStack gap="400">
-                            <Text as="h2" variant="headingMd">Personnalisation du Bot</Text>
+                            <Text as="h2" variant="headingMd">{t('customization.section_title')}</Text>
 
                             {/* Visuals Section (Top) */}
                             <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginBottom: "2rem" }}>
@@ -181,7 +196,7 @@ export default function CustomizationPage() {
                                 {/* Left Column: Controls (Color + Photo) */}
                                 <div style={{ flex: "1 1 300px" }}>
                                     <FormLayout>
-                                        <Text variant="headingSm" as="h6">Couleur du Widget</Text>
+                                        <Text variant="headingSm" as="h6">{t('customization.widget_color')}</Text>
                                         <div style={{ display: "flex", alignItems: "end", gap: "10px", marginBottom: "1rem" }}>
                                             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px" }}>
                                                 <div
@@ -198,11 +213,11 @@ export default function CustomizationPage() {
                                                         justifyContent: "center"
                                                     }}
                                                     onClick={() => document.getElementById("native-color-picker").click()}
-                                                    title="Cliquer pour changer la couleur"
+                                                    title={t('customization.click_to_change')}
                                                 >
                                                     <span style={{ fontSize: "20px", filter: "drop-shadow(0 0 2px rgba(255,255,255,0.8))" }}>🎨</span>
                                                 </div>
-                                                <Text variant="bodyXs" tone="subdued">Cliquer</Text>
+                                                <Text variant="bodyXs" tone="subdued">{t('customization.click')}</Text>
                                             </div>
 
                                             <input
@@ -214,18 +229,18 @@ export default function CustomizationPage() {
                                             />
                                             <div style={{ flexGrow: 1 }}>
                                                 <TextField
-                                                    label="Code Hex"
+                                                    label={t('customization.hex_code')}
                                                     value={color}
                                                     onChange={setColor}
                                                     autoComplete="off"
                                                     placeholder="#000000"
-                                                    helpText="Ou entrez le code couleur manuellement."
+                                                    helpText={t('customization.hex_help')}
                                                 />
                                             </div>
                                         </div>
 
                                         <div style={{ marginBottom: "1rem" }}>
-                                            <Text variant="headingSm" as="h6">Photo de Profil du Bot</Text>
+                                            <Text variant="headingSm" as="h6">{t('customization.profile_pic')}</Text>
                                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginTop: '0.5rem' }}>
                                                 {botIcon && (
                                                     <div style={{ flexShrink: 0 }}>
@@ -238,16 +253,16 @@ export default function CustomizationPage() {
                                                 )}
                                                 <div style={{ flexGrow: 1 }}>
                                                     <BlockStack gap="200">
-                                                        <DropZone onDrop={handleDrop} accept="image/*" type="image" allowMultiple={false} label="Télécharger une image">
+                                                        <DropZone onDrop={handleDrop} accept="image/*" type="image" allowMultiple={false} label={t('customization.upload_label')}>
                                                             {(!botIcon && !file) && <DropZone.FileUpload />}
                                                         </DropZone>
                                                         <TextField
-                                                            label="Ou coller une URL"
+                                                            label={t('customization.url_label')}
                                                             value={botIcon}
                                                             onChange={setBotIcon}
                                                             autoComplete="off"
-                                                            placeholder="https://..."
-                                                            helpText="Lien direct vers une image."
+                                                            placeholder={t('customization.url_placeholder')}
+                                                            helpText={t('customization.url_help')}
                                                         />
                                                     </BlockStack>
                                                 </div>
@@ -259,7 +274,7 @@ export default function CustomizationPage() {
                                 {/* Right Column: Preview */}
                                 <div style={{ flex: "1 1 300px" }}>
                                     <Box paddingBlockEnd="400">
-                                        <Text variant="headingSm" as="h6">Aperçu du Chat</Text>
+                                        <Text variant="headingSm" as="h6">{t('customization.chat_preview')}</Text>
                                         <div style={{
                                             border: "1px solid #e1e3e5",
                                             borderRadius: "12px",
@@ -278,7 +293,7 @@ export default function CustomizationPage() {
                                                 justifyContent: "space-between",
                                                 alignItems: "center"
                                             }}>
-                                                <span>Négociation en direct</span>
+                                                <span>{t('customization.live_negotiation')}</span>
                                                 <span>✕</span>
                                             </div>
                                             {/* Body */}
@@ -351,21 +366,21 @@ export default function CustomizationPage() {
                             {/* Content Section (Bottom) */}
                             <FormLayout>
                                 <Select
-                                    label="Ton de la conversation"
+                                    label={t('customization.tone_label')}
                                     options={[
-                                        { label: 'Personnalisé', value: 'custom' },
-                                        { label: 'Standard', value: 'standard' },
-                                        { label: 'Amical / Sympa', value: 'friendly' },
-                                        { label: 'Professionnel', value: 'professional' },
-                                        { label: 'Direct / Minimaliste', value: 'minimalist' },
+                                        { label: t('customization.tones.custom'), value: 'custom' },
+                                        { label: t('customization.tones.standard'), value: 'standard' },
+                                        { label: t('customization.tones.friendly'), value: 'friendly' },
+                                        { label: t('customization.tones.professional'), value: 'professional' },
+                                        { label: t('customization.tones.minimalist'), value: 'minimalist' },
                                     ]}
                                     onChange={handleToneChange}
                                     value={tone}
-                                    helpText="Sélectionnez un style pour pré-remplir les messages ci-dessous."
+                                    helpText={t('customization.tone_help')}
                                 />
 
                                 <TextField
-                                    label="Message de Bienvenue"
+                                    label={t('customization.welcome_msg')}
                                     value={welcomeMsg}
                                     onChange={(val) => { setWelcomeMsg(val); setTone('custom'); }}
                                     autoComplete="off"
@@ -373,21 +388,21 @@ export default function CustomizationPage() {
                                 />
 
                                 <TextField
-                                    label="Message de Contre-offre"
+                                    label={t('customization.counter_msg')}
                                     value={rejectMsg}
                                     onChange={(val) => { setRejectMsg(val); setTone('custom'); }}
                                     autoComplete="off"
                                     multiline={2}
-                                    helpText="Si vous ne mettez pas le prix, il sera ajouté automatiquement à la fin."
+                                    helpText={t('customization.msg_help')}
                                 />
 
                                 <TextField
-                                    label="Message de Succès"
+                                    label={t('customization.success_msg')}
                                     value={successMsg}
                                     onChange={(val) => { setSuccessMsg(val); setTone('custom'); }}
                                     autoComplete="off"
                                     multiline={2}
-                                    helpText="Si vous ne mettez pas le prix, il sera ajouté automatiquement à la fin."
+                                    helpText={t('customization.msg_help')}
                                 />
                             </FormLayout>
                         </BlockStack>

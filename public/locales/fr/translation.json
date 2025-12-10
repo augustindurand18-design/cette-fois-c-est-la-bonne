@@ -1,0 +1,69 @@
+{
+    "common": {
+        "save": "Enregistrer",
+        "saving": "Enregistrement...",
+        "success": "Succès"
+    },
+    "dashboard": {
+        "title": "Tableau de Bord",
+        "total_offers": "Total Offres",
+        "accepted": "Acceptées",
+        "rejected": "Refusées",
+        "recent_offers": "Offres Récentes",
+        "product": "Produit",
+        "date": "Date",
+        "offer": "Offre",
+        "status": "Statut",
+        "no_offers": "Aucune offre pour le moment.",
+        "unknown_product": "Produit inconnu"
+    },
+    "rules": {
+        "title": "Règles & Paramètres",
+        "subtitle": "Configuration générale du comportement du bot.",
+        "activation": "Activation",
+        "bot_active": "Bot Actif",
+        "bot_inactive": "Bot Inactif",
+        "active_desc": "Le bot est actif et interagit avec vos clients pour négocier.",
+        "inactive_desc": "Le bot est désactivé. Le widget n'apparaîtra pas sur votre boutique.",
+        "behavior": "Comportement",
+        "rounds_label": "Nombre de tours de négociation",
+        "strategy_label": "Stratégie de concession",
+        "allow_sales_label": "Autoriser la négociation sur les produits soldés",
+        "price_rounding": "Prix & Arrondis",
+        "rounding_label": "Arrondi des contre-offres (.XX)",
+        "exit_intent_label": "Activer le déclencheur de sortie (Exit Intent)",
+        "exit_intent_help": "Ouvre le chat automatiquement lorsque la souris du client quitte la fenêtre.",
+        "help_rounds": "Nombre maximum de contre-propositions que le bot peut faire.",
+        "help_sales": "Si décoché, le bot refusera de négocier si le produit a déjà un prix comparateur."
+    },
+    "customization": {
+        "title": "Personnalisation",
+        "subtitle": "Gérez l'apparence et le ton de votre bot de négociation.",
+        "section_title": "Personnalisation du Bot",
+        "widget_color": "Couleur du Widget",
+        "click_to_change": "Cliquer pour changer la couleur",
+        "click": "Cliquer",
+        "hex_code": "Code Hex",
+        "hex_help": "Ou entrez le code couleur manuellement.",
+        "profile_pic": "Photo de Profil du Bot",
+        "upload_label": "Télécharger une image",
+        "url_label": "Ou coller une URL",
+        "url_placeholder": "https://...",
+        "url_help": "Lien direct vers une image.",
+        "chat_preview": "Aperçu du Chat",
+        "live_negotiation": "Négociation en direct",
+        "tone_label": "Ton de la conversation",
+        "tone_help": "Sélectionnez un style pour pré-remplir les messages ci-dessous.",
+        "welcome_msg": "Message de Bienvenue",
+        "counter_msg": "Message de Contre-offre",
+        "success_msg": "Message de Succès",
+        "msg_help": "Si vous ne mettez pas le prix, il sera ajouté automatiquement à la fin.",
+        "tones": {
+            "custom": "Personnalisé",
+            "standard": "Standard",
+            "friendly": "Amical / Sympa",
+            "professional": "Professionnel",
+            "minimalist": "Direct / Minimaliste"
+        }
+    }
+}

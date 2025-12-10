@@ -1,0 +1,69 @@
+{
+    "common": {
+        "save": "Save",
+        "saving": "Saving...",
+        "success": "Success"
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "total_offers": "Total Offers",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "recent_offers": "Recent Offers",
+        "product": "Product",
+        "date": "Date",
+        "offer": "Offer",
+        "status": "Status",
+        "no_offers": "No offers yet.",
+        "unknown_product": "Unknown Product"
+    },
+    "rules": {
+        "title": "Rules & Settings",
+        "subtitle": "General configuration of bot behavior.",
+        "activation": "Activation",
+        "bot_active": "Bot Active",
+        "bot_inactive": "Bot Inactive",
+        "active_desc": "The bot is active and interacting with your customers.",
+        "inactive_desc": "The bot is disabled. The widget will not appear on your store.",
+        "behavior": "Behavior",
+        "rounds_label": "Number of negotiation rounds",
+        "strategy_label": "Concession Strategy",
+        "allow_sales_label": "Allow negotiation on sale items",
+        "price_rounding": "Prices & Rounding",
+        "rounding_label": "Counter-offer rounding (.XX)",
+        "exit_intent_label": "Enable Exit Intent Trigger",
+        "exit_intent_help": "Automatically opens the chat when the customer's mouse leaves the window.",
+        "help_rounds": "Maximum number of counter-offers the bot can make.",
+        "help_sales": "If unchecked, the bot will refuse to negotiate if the product already has a compare-at price."
+    },
+    "customization": {
+        "title": "Customization",
+        "subtitle": "Manage the appearance and tone of your negotiation bot.",
+        "section_title": "Bot Customization",
+        "widget_color": "Widget Color",
+        "click_to_change": "Click to change color",
+        "click": "Click",
+        "hex_code": "Hex Code",
+        "hex_help": "Or enter color code manually.",
+        "profile_pic": "Bot Profile Picture",
+        "upload_label": "Upload an image",
+        "url_label": "Or paste a URL",
+        "url_placeholder": "https://...",
+        "url_help": "Direct link to an image.",
+        "chat_preview": "Chat Preview",
+        "live_negotiation": "Live Negotiation",
+        "tone_label": "Conversation Tone",
+        "tone_help": "Select a style to pre-fill the messages below.",
+        "welcome_msg": "Welcome Message",
+        "counter_msg": "Counter-offer Message",
+        "success_msg": "Success Message",
+        "msg_help": "If you don't include the price, it will be automatically added at the end.",
+        "tones": {
+            "custom": "Custom",
+            "standard": "Standard",
+            "friendly": "Friendly",
+            "professional": "Professional",
+            "minimalist": "Direct / Minimalist"
+        }
+    }
+}

@@ -1,107 +1,270 @@
 .smart-offer-modal {
-  display: none; 
-  position: fixed; 
-  z-index: 9999; 
+  display: none;
+  position: fixed;
+  z-index: 2147483647;
+  /* Ensure it's on top of everything */
   left: 0;
   top: 0;
-  width: 100%; 
-  height: 100%; 
-  background-color: rgba(0,0,0,0.5); 
-  backdrop-filter: blur(2px);
-  animation: fadeIn 0.3s;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s ease-out;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .smart-offer-chat-container {
   background-color: #fff;
-  margin: 5% auto; 
-  width: 90%; 
-  max-width: 400px;
+  width: 380px;
   height: 600px;
+  max-width: 90%;
   max-height: 80vh;
-  border-radius: 16px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Centering */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes scaleIn {
+  from {
+    transform: translate(-50%, -48%) scale(0.96);
+    opacity: 0;
+  }
+
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+  .smart-offer-chat-container {
+    position: fixed;
+    /* Enforce fixed to support viewport sync */
+    width: 100%;
+    height: 100dvh;
+    /* Use dvh for dynamic viewport handling */
+    max-width: 100%;
+    max-height: 100dvh;
+    border-radius: 0;
+    top: 0;
+    left: 0;
+    transform: none;
+    animation: slideUpMobile 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes slideUpMobile {
+    from {
+      transform: translateY(100%);
+    }
+
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  .smart-offer-input-area {
+    /* Increase padding to ensure input doesn't tech bottom edge/keyboard */
+    padding-bottom: max(35px, env(safe-area-inset-bottom));
+    transition: padding-bottom 0.2s;
+  }
+
+  /* When keyboard is open (detected by JS), remove the extra padding to sit flush */
+  .smart-offer-chat-container.keyboard-open .smart-offer-input-area {
+    padding-bottom: 8px;
+    /* Minimal padding */
+  }
 }
 
 .smart-offer-header {
-  background-color: #f5f5f5;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e0e0e0;
+  background-color: #f7f7f8;
+  padding: 16px 20px;
+  border-bottom: 1px solid #ebECED;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .smart-offer-title {
-  font-weight: 600;
-  font-size: 16px;
-  color: #333;
+  font-weight: 700;
+  font-size: 17px;
+  color: #1c1c1e;
+  letter-spacing: -0.4px;
 }
 
 .smart-offer-close {
-  color: #999;
-  font-size: 24px;
-  font-weight: bold;
+  color: #8e8e93;
+  font-size: 28px;
+  font-weight: 400;
   cursor: pointer;
-  line-height: 1;
+  line-height: 0.8;
+  transition: color 0.2s;
 }
 
 .smart-offer-close:hover {
-  color: #333;
+  color: #1c1c1e;
 }
 
 .smart-offer-messages {
   flex: 1;
-  padding: 20px;
+  padding: 20px 16px;
   overflow-y: auto;
   background-color: #ffffff;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 12px;
+  scroll-behavior: smooth;
 }
 
-.smart-offer-message {
-  max-width: 80%;
-  padding: 10px 15px;
-  border-radius: 18px;
+/* Message Container (Row) */
+.smart-offer-message-container {
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: 4px;
+  width: 100%;
+}
+
+.smart-offer-message-container.bot {
+  justify-content: flex-start;
+}
+
+.smart-offer-message-container.user {
+  justify-content: flex-end;
+}
+
+/* Bot Icon */
+.smart-offer-bot-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 8px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* The text bubble */
+.smart-offer-message-bubble {
+  max-width: 78%;
+  padding: 10px 16px;
+  border-radius: 20px;
   font-size: 15px;
-  line-height: 1.4;
+  line-height: 1.45;
   position: relative;
   word-wrap: break-word;
-  animation: messageSlideIn 0.3s ease-out;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  animation: messagePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: bottom left;
 }
 
-@keyframes messageSlideIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes messagePop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
-.smart-offer-message.bot {
-  background-color: #f0f0f0;
-  color: #333;
-  align-self: flex-start;
+.smart-offer-message-bubble.bot {
+  background-color: #f2f2f7 !important;
+  /* iOS Neutral */
+  color: #1c1c1e;
   border-bottom-left-radius: 4px;
 }
 
-.smart-offer-message.user {
-  background-color: #007aff; /* iMessage Blue-ish */
+.smart-offer-message-bubble.user {
+  background-color: #007aff;
   color: white;
-  align-self: flex-end;
   border-bottom-right-radius: 4px;
+  transform-origin: bottom right;
+  box-shadow: 0 2px 6px rgba(0, 122, 255, 0.25);
 }
 
+/* Typing Indicator */
+.smart-offer-typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+  background-color: #f2f2f7 !important;
+  border-radius: 20px;
+  border-bottom-left-radius: 4px;
+  width: fit-content;
+}
+
+.smart-offer-typing span {
+  width: 6px;
+  height: 6px;
+  background-color: #8e8e93;
+  border-radius: 50%;
+  animation: typingBounce 1.4s infinite ease-in-out both;
+  display: block;
+}
+
+.smart-offer-typing span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.smart-offer-typing span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes typingBounce {
+
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+
 .smart-offer-input-area {
-  padding: 15px;
-  border-top: 1px solid #e0e0e0;
-  background-color: #f9f9f9;
+  padding: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f2f2f7;
+  background-color: #fff;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -109,62 +272,131 @@
 
 #smart-offer-input {
   flex: 1;
-  padding: 12px 15px;
-  border: 1px solid #ddd;
-  border-radius: 25px;
+  padding: 12px 16px;
+  border: 1px solid #e5e5ea;
+  border-radius: 24px;
   outline: none;
-  font-size: 15px;
-  transition: border-color 0.2s;
+  font-size: 16px;
+  /* 16px prevents iOS zoom on focus */
+  background-color: #f9f9f9;
+  transition: all 0.2s;
 }
 
 #smart-offer-input:focus {
   border-color: #007aff;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
 }
 
 #smart-offer-submit {
   background-color: #007aff;
   color: white;
   border: none;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: transform 0.1s, background-color 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+}
+
+#smart-offer-submit:active {
+  transform: scale(0.95);
 }
 
 #smart-offer-submit:hover {
-  background-color: #0056b3;
+  background-color: #006ce6;
 }
 
 #smart-offer-submit:disabled {
-  background-color: #ccc;
+  background-color: #e5e5ea;
+  color: #aeaeb2;
+  box-shadow: none;
   cursor: not-allowed;
-}
-
-/* Typography specifics */
-.smart-offer-message p {
-    margin: 0;
 }
 
 /* Action button inside chat */
 .smart-offer-action-btn {
-    display: block;
-    width: 100%;
-    margin-top: 10px;
-    padding: 10px;
-    background-color: white;
-    color: #007aff;
-    border: 1px solid #007aff;
-    border-radius: 8px;
-    text-align: center;
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: none;
-}
-.smart-offer-action-btn:hover {
-    background-color: #f0f8ff;
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px;
+  background-color: #fff;
+  color: #007aff;
+  border: 1px solid #e1e1e6;
+  border-radius: 12px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
 }
 
+.smart-offer-action-btn:hover {
+  background-color: #f2f2f7;
+  border-color: #d1d1d6;
+  transform: translateY(-1px);
+}
+
+
+/* Shake Animation */
+@keyframes smartOfferShake {
+
+  0%,
+  100% {
+    transform: translate(-50%, -50%);
+  }
+
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translate(-52%, -50%);
+  }
+
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translate(-48%, -50%);
+  }
+}
+
+.smart-offer-shake {
+  animation: smartOfferShake 0.4s cubic-bezier(.36, .07, .19, .97) both;
+}
+
+@media (max-width: 480px) {
+  @keyframes smartOfferShakeMobile {
+
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+      transform: translateY(-2px);
+    }
+
+    20%,
+    40%,
+    60%,
+    80% {
+      transform: translateY(2px);
+    }
+  }
+
+  .smart-offer-shake {
+    animation: smartOfferShakeMobile 0.4s cubic-bezier(.36, .07, .19, .97) both;
+  }
+}
