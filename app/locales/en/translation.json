@@ -1,0 +1,206 @@
+{
+    "common": {
+        "save": "Save",
+        "saving": "Saving...",
+        "success": "Success",
+        "exporting": "Exporting...",
+        "export_csv": "Export CSV",
+        "apply": "Apply"
+    },
+    "negotiation": {
+        "reactions": {
+            "SHOCKED": [
+                "This offer is well below our expectations. However, we can offer you {{price}} €.",
+                "Unfortunately we cannot accept such a low offer. The product deserves better. I propose {{price}} €.",
+                "This price is too far from the item's value. We could go down to {{price}} €.",
+                "Your offer is a bit too aggressive. Can we agree on {{price}} €?",
+                "We are open to negotiation, but this amount is insufficient. What do you say to {{price}} €?"
+            ],
+            "LOW": [
+                "That's a good effort, but we cannot go that low. Our best offer is {{price}} €.",
+                "We are getting closer, but this price is still below our limit. I can let it go for {{price}} €.",
+                "I cannot validate this amount, but I am sure we can find an agreement at {{price}} €.",
+                "Your offer is interesting but still a bit tight. I propose {{price}} €.",
+                "We are almost there. A little extra effort? I can go down to {{price}} €."
+            ],
+            "CLOSE": [
+                "We are very close to an agreement. One small step towards {{price}} €?",
+                "Your offer is tempting. If you accept {{price}} €, we have a deal.",
+                "We are reaching the goal. Would you agree to {{price}} €?",
+                "The gap is minimal. I can make you a final proposal at {{price}} €.",
+                "It's almost validated. Let's agree on {{price}} €."
+            ],
+            "SUCCESS": [
+                "Understood. We accept your offer with pleasure.",
+                "Deal concluded. You benefit from this preferential rate.",
+                "That is a fair offer. We are delighted to accept it.",
+                "Proposal validated. Thank you for this constructive negotiation.",
+                "It's okay for us. Enjoy your purchase."
+            ],
+            "HIGH": [
+                "No need to offer more, the current price is {{price}} €.",
+                "The displayed price is already {{price}} €, you won't pay more.",
+                "Our price is {{price}} €, we don't take overbidding."
+            ],
+            "invalid_offer": "I didn't understand your price. Can you give me an amount (e.g., 45)?",
+            "sale_restriction": "Sorry, I cannot negotiate on items that are already on sale.",
+            "min_limit_reached": "Sorry, I cannot go lower than {{price}} €. That is my final price."
+        }
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "total_offers": "Total Offers",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "recent_offers": "Recent Offers",
+        "product": "Product",
+        "date": "Date",
+        "offer": "Offer",
+        "status": "Status",
+        "no_offers": "No offers yet.",
+        "text": "Product",
+        "unknown_product": "Unknown Product",
+        "period_filters": "Period Filters",
+        "period": "Period",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "last_3d": "Last 3 days",
+        "last_7d": "Last 7 days",
+        "last_30d": "Last 30 days",
+        "custom": "Custom",
+        "start_date": "Start Date",
+        "end_date": "End Date",
+        "revenue_generated": "Revenue Generated",
+        "acceptance_rate": "Acceptance Rate",
+        "total_offers_text": "total offers",
+        "avg_discount": "Avg Discount"
+    },
+    "rules": {
+        "title": "Rules & Settings",
+        "subtitle": "General configuration of bot behavior.",
+        "activation": "Activation",
+        "bot_active": "Active",
+        "bot_inactive": "Inactive",
+        "bot_status": "Widget Status",
+        "active_desc": "The widget is visible on your store.",
+        "inactive_desc": "The widget is hidden.",
+        "negotiation_mode": "Negotiation Mode",
+        "mode_auto": "Automatic (AI)",
+        "mode_manual": "Manual (Email)",
+        "mode_auto_desc": "Bot negotiates alone and closes the sale.",
+        "mode_manual_desc": "Bot asks for email so you can reply yourself.",
+        "behavior": "Behavior",
+        "rounds_label": "Number of negotiation rounds",
+        "strategy_label": "Concession Strategy",
+        "allow_sales_label": "Allow negotiation on sale items",
+        "price_rounding": "Prices & Rounding",
+        "rounding_label": "Counter-offer rounding (.XX)",
+        "exit_intent_label": "Enable Exit Intent Trigger",
+        "exit_intent_help": "Automatically opens the chat when the customer's mouse leaves the window.",
+        "help_rounds": "Maximum number of counter-offers the bot can make.",
+        "help_sales": "If unchecked, the bot will refuse to negotiate if the product already has a compare-at price."
+    },
+    "customization": {
+        "title": "Customization",
+        "subtitle": "Manage the appearance and tone of your negotiation bot.",
+        "section_title": "Chatbot Configuration",
+        "auto_negotiation": "Automatic Negotiation (Bot)",
+        "auto_negotiation_help": "If disabled, the bot will ask for customer email and you will have to respond manually.",
+        "html_preview": "Widget Preview",
+        "click_to_change": "Click to change color",
+        "click": "Click",
+        "hex_code": "Hex Code",
+        "hex_help": "Or enter color code manually.",
+        "profile_pic": "Bot Profile Picture",
+        "upload_label": "Upload an image",
+        "url_label": "Or paste a URL",
+        "url_placeholder": "https://...",
+        "url_help": "Direct link to an image.",
+        "chat_preview": "Chat Preview",
+        "live_negotiation": "Live Negotiation",
+        "tone_label": "Conversation Tone",
+        "tone_help": "Select a style to pre-fill the messages below.",
+        "welcome_msg": "Welcome Message",
+        "counter_msg": "Counter-offer Message",
+        "success_msg": "Success Message",
+        "msg_help": "If you don't include the price, it will be automatically added at the end.",
+        "tones": {
+            "custom": "Custom",
+            "standard": "Standard",
+            "friendly": "Friendly",
+            "professional": "Professional",
+            "minimalist": "Direct / Minimalist"
+        },
+        "presets": {
+            "standard": {
+                "welcome": "Hello! 👋 I can offer you a discount if you propose a reasonable price. What is your price?",
+                "reject": "That's a bit tight... I can do it for {price} €.",
+                "success": "It's a deal for {price}€! 🎉"
+            },
+            "friendly": {
+                "welcome": "Hi! 👋 I'm in a negotiating mood today. Make me your best offer!",
+                "reject": "Whoa, that's low! 😅 I can go down to {price} € to make you happy.",
+                "success": "Awesome! Sold for {price}€! Go for it! 🚀"
+            },
+            "professional": {
+                "welcome": "Hello. We are open to discussion. What is your price proposal?",
+                "reject": "This offer is below our threshold. We can propose {price} €.",
+                "success": "Your offer of {price}€ is accepted. Thank you for your trust."
+            },
+            "minimalist": {
+                "welcome": "Make an offer.",
+                "reject": "Too low. Min: {price} €.",
+                "success": "Ok for {price}€."
+            }
+        }
+    },
+    "products": {
+        "title": "Products & Collections",
+        "subtitle": "Manage discounts for specific products or collections.",
+        "specific_rules": "Specific Rules",
+        "add_product": "Add Product",
+        "add_collection": "Add Collection",
+        "search_placeholder": "Product or collection name...",
+        "no_results": "No results found.",
+        "no_rules": "No rules defined. Add a product or a collection.",
+        "rule_singular": "rule",
+        "rule_plural": "rules",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "activate": "Activate",
+        "deactivate": "Deactivate",
+        "delete": "Delete",
+        "max_discount": "Max Discount",
+        "min_accepted_price": "Min Accepted Price",
+        "base_price": "Base Price",
+        "modify_rule": "Modify rule for"
+    },
+    "parameters": {
+        "email_settings": "Email Configuration (Gmail)",
+        "gmail_user": "Gmail Address",
+        "gmail_user_help": "The email address sending the responses.",
+        "gmail_password": "App Password",
+        "gmail_password_help": "Generate an App Password in your Google Account > Security."
+    },
+    "nav": {
+        "dashboard": "Dashboard",
+        "rules": "Rules",
+        "products": "My Products",
+        "offers": "Offers",
+        "customization": "Customization",
+        "parameters": "Parameters"
+    },
+    "offers": {
+        "title": "Pending Offers",
+        "empty_heading": "No pending offers",
+        "empty_body": "Offers requiring manual review will appear here.",
+        "accept": "Accept",
+        "reject": "Reject",
+        "counter": "Counter-Offer",
+        "counter_modal_title": "Propose New Price",
+        "counter_instruction": "Start negotiation with {{email}} who offered {{price}}€.",
+        "new_price": "New Price (€)",
+        "send_counter": "Send Proposal",
+        "cancel": "Cancel"
+    }
+}

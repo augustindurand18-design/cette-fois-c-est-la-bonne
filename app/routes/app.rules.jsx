@@ -11,7 +11,10 @@ import {
     Box,
     Banner,
     InlineStack,
-    Button
+
+    Button,
+    ButtonGroup,
+    RadioButton
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
@@ -42,7 +45,8 @@ export const loader = async ({ request }) => {
         maxRounds: shop.maxRounds,
         strategy: shop.strategy,
         allowSaleItems: shop.allowSaleItems,
-        enableExitIntent: shop.enableExitIntent
+        enableExitIntent: shop.enableExitIntent,
+        autoNegotiation: shop.autoNegotiation !== false
     };
 };
 
@@ -60,6 +64,16 @@ export const action = async ({ request }) => {
         const allowSaleItems = formData.get("allowSaleItems") === "true";
         const enableExitIntent = formData.get("enableExitIntent") === "true";
 
+        console.log("Saving Rules:", {
+            priceRounding,
+            isActive,
+            maxRounds,
+            strategy,
+            allowSaleItems,
+            enableExitIntent,
+            autoNegotiationVal: formData.get("autoNegotiation")
+        });
+
         await db.shop.update({
             where: { id: shop.id },
             data: {
@@ -68,7 +82,8 @@ export const action = async ({ request }) => {
                 maxRounds: !isNaN(maxRounds) ? maxRounds : 3,
                 strategy,
                 allowSaleItems,
-                enableExitIntent
+                enableExitIntent,
+                autoNegotiation: formData.get("autoNegotiation") === "true"
             },
         });
 
@@ -89,8 +104,11 @@ export default function RulesPage() {
     const [strategy, setStrategy] = useState(loaderData.strategy);
     const [allowSaleItems, setAllowSaleItems] = useState(loaderData.allowSaleItems);
     const [enableExitIntent, setEnableExitIntent] = useState(loaderData.enableExitIntent);
+    const [autoNegotiation, setAutoNegotiation] = useState(loaderData.autoNegotiation);
 
     const [isDirty, setIsDirty] = useState(false);
+
+
 
     useEffect(() => {
         const isModified =
@@ -99,10 +117,11 @@ export default function RulesPage() {
             maxRounds !== loaderData.maxRounds.toString() ||
             strategy !== loaderData.strategy ||
             allowSaleItems !== loaderData.allowSaleItems ||
-            enableExitIntent !== loaderData.enableExitIntent;
+            enableExitIntent !== loaderData.enableExitIntent ||
+            autoNegotiation !== loaderData.autoNegotiation;
 
         setIsDirty(isModified);
-    }, [rounding, isActive, maxRounds, strategy, allowSaleItems, enableExitIntent, loaderData]);
+    }, [rounding, isActive, maxRounds, strategy, allowSaleItems, enableExitIntent, autoNegotiation, loaderData]);
 
     const handleSave = () => {
         fetcher.submit({
@@ -112,7 +131,8 @@ export default function RulesPage() {
             maxRounds: maxRounds,
             strategy: strategy,
             allowSaleItems: allowSaleItems.toString(),
-            enableExitIntent: enableExitIntent.toString()
+            enableExitIntent: enableExitIntent.toString(),
+            autoNegotiation: autoNegotiation.toString()
         }, { method: "POST" });
     };
 
@@ -123,37 +143,62 @@ export default function RulesPage() {
             primaryAction={{
                 content: fetcher.state !== "idle" ? t('common.saving') : t('common.save'),
                 onAction: handleSave,
-                disabled: !isDirty || fetcher.state !== "idle",
+                disabled: fetcher.state !== "idle",
             }}
         >
             <Layout>
                 <Layout.Section>
                     <Card>
                         <BlockStack gap="400">
-                            <InlineStack align="space-between" blockAlign="center">
-                                <Text as="h2" variant="headingMd">{t('rules.activation')}</Text>
-                                <Button
-                                    variant={isActive ? "primary" : "secondary"}
-                                    tone={isActive ? "success" : "critical"}
-                                    onClick={() => setIsActive(!isActive)}
-                                >
-                                    {isActive ? t('rules.bot_active') : t('rules.bot_inactive')}
-                                </Button>
-                            </InlineStack>
-                            <Box>
-                                <Text tone="subdued">
-                                    {isActive
-                                        ? t('rules.active_desc')
-                                        : t('rules.inactive_desc')
-                                    }
-                                </Text>
-                            </Box>
+                            <Text as="h2" variant="headingMd">{t('rules.activation')}</Text>
+
+                            <BlockStack gap="400">
+                                {/* Global Activation */}
+                                <InlineStack align="space-between" blockAlign="center">
+                                    <Box>
+                                        <Text variant="headingSm">{t('rules.bot_status')}</Text>
+                                        <Text tone="subdued" variant="bodySm">{isActive ? t('rules.active_desc') : t('rules.inactive_desc')}</Text>
+                                    </Box>
+                                    <Button
+                                        variant={isActive ? "primary" : "secondary"}
+                                        tone={isActive ? "success" : "critical"}
+                                        onClick={() => setIsActive(!isActive)}
+                                    >
+                                        {isActive ? t('rules.bot_active') : t('rules.bot_inactive')}
+                                    </Button>
+                                </InlineStack>
+
+                                <Box borderBlockStartWidth="025" borderColor="border-subdued" paddingBlockStart="400">
+                                    <InlineStack align="space-between" blockAlign="center">
+                                        <BlockStack gap="200">
+                                            <RadioButton
+                                                label={t('rules.mode_auto')}
+                                                helpText={t('rules.mode_auto_desc')}
+                                                checked={autoNegotiation}
+                                                id="modeAuto"
+                                                name="negotiationMode"
+                                                onChange={() => setAutoNegotiation(true)}
+                                            />
+                                            <RadioButton
+                                                label={t('rules.mode_manual')}
+                                                helpText={t('rules.mode_manual_desc')}
+                                                checked={!autoNegotiation}
+                                                id="modeManual"
+                                                name="negotiationMode"
+                                                onChange={() => setAutoNegotiation(false)}
+                                            />
+                                        </BlockStack>
+                                    </InlineStack>
+                                </Box>
+                            </BlockStack>
                         </BlockStack>
                     </Card>
 
                     <Card>
                         <BlockStack gap="400">
                             <Text as="h2" variant="headingMd">{t('rules.behavior')}</Text>
+
+
 
                             <Select
                                 label={t('rules.rounds_label')}
@@ -162,7 +207,7 @@ export default function RulesPage() {
                                     { label: '3 (Classique)', value: '3' },
                                     { label: '5 (Longue négociation)', value: '5' },
                                 ]}
-                                onChange={setMaxRounds}
+                                onChange={(val) => setMaxRounds(val)}
                                 value={maxRounds}
                                 helpText={t('rules.help_rounds')}
                             />
@@ -174,7 +219,7 @@ export default function RulesPage() {
                                     { label: 'Modéré (Équilibré)', value: 'moderate' },
                                     { label: 'Ferme (Lâche prise difficilement)', value: 'aggressive' },
                                 ]}
-                                onChange={setStrategy}
+                                onChange={(val) => setStrategy(val)}
                                 value={strategy}
                                 helpText="Défaut: Modéré"
                             />
@@ -182,14 +227,14 @@ export default function RulesPage() {
                             <Checkbox
                                 label={t('rules.allow_sales_label')}
                                 checked={allowSaleItems}
-                                onChange={setAllowSaleItems}
+                                onChange={(val) => setAllowSaleItems(val)}
                                 helpText={t('rules.help_sales')}
                             />
 
                             <Checkbox
                                 label={t('rules.exit_intent_label')}
                                 checked={enableExitIntent}
-                                onChange={setEnableExitIntent}
+                                onChange={(val) => setEnableExitIntent(val)}
                                 helpText={t('rules.exit_intent_help')}
                             />
                         </BlockStack>

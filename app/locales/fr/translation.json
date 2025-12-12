@@ -1,0 +1,166 @@
+{
+    "common": {
+        "save": "Enregistrer",
+        "saving": "Enregistrement...",
+        "success": "Succès"
+    },
+    "dashboard": {
+        "title": "Tableau de Bord",
+        "total_offers": "Total Offres",
+        "accepted": "Acceptées",
+        "rejected": "Refusées",
+        "recent_offers": "Offres Récentes",
+        "product": "Produit",
+        "date": "Date",
+        "offer": "Offre",
+        "status": "Statut",
+        "no_offers": "Aucune offre pour le moment.",
+        "unknown_product": "Produit inconnu"
+    },
+    "rules": {
+        "title": "Règles & Paramètres",
+        "subtitle": "Configuration générale du comportement du bot.",
+        "activation": "Activation",
+        "bot_active": "Activé",
+        "bot_inactive": "Désactivé",
+        "bot_status": "Statut du Widget",
+        "active_desc": "Le widget est visible sur la boutique.",
+        "inactive_desc": "Le widget est caché.",
+        "negotiation_mode": "Mode de Négociation",
+        "mode_auto": "Automatique (IA)",
+        "mode_manual": "Manuel (Email)",
+        "mode_auto_desc": "Le bot négocie seul et conclut la vente.",
+        "mode_manual_desc": "Le bot demande l'email du client pour que vous répondiez.",
+        "behavior": "Comportement",
+        "rounds_label": "Nombre de tours de négociation",
+        "strategy_label": "Stratégie de concession",
+        "allow_sales_label": "Autoriser la négociation sur les produits soldés",
+        "price_rounding": "Prix & Arrondis",
+        "rounding_label": "Arrondi des contre-offres (.XX)",
+        "exit_intent_label": "Activer le déclencheur de sortie (Exit Intent)",
+        "exit_intent_help": "Ouvre le chat automatiquement lorsque la souris du client quitte la fenêtre.",
+        "help_rounds": "Nombre maximum de contre-propositions que le bot peut faire.",
+        "help_sales": "Si décoché, le bot refusera de négocier si le produit a déjà un prix comparateur."
+    },
+    "customization": {
+        "title": "Personnalisation",
+        "subtitle": "Gérez l'apparence et le ton de votre bot de négociation.",
+        "section_title": "Configuration du Chatbot",
+        "auto_negotiation": "Négociation Automatique (Bot)",
+        "auto_negotiation_help": "Si désactivé, le bot demandera l'email du client et vous devrez répondre manuellement.",
+        "widget_color": "Couleur du Widget",
+        "click_to_change": "Cliquer pour changer la couleur",
+        "click": "Cliquer",
+        "hex_code": "Code Hex",
+        "hex_help": "Ou entrez le code couleur manuellement.",
+        "profile_pic": "Photo de Profil du Bot",
+        "upload_label": "Télécharger une image",
+        "url_label": "Ou coller une URL",
+        "url_placeholder": "https://...",
+        "url_help": "Lien direct vers une image.",
+        "chat_preview": "Aperçu du Chat",
+        "live_negotiation": "Négociation en direct",
+        "tone_label": "Ton de la conversation",
+        "tone_help": "Sélectionnez un style pour pré-remplir les messages ci-dessous.",
+        "welcome_msg": "Message de Bienvenue",
+        "counter_msg": "Message de Contre-offre",
+        "success_msg": "Message de Succès",
+        "msg_help": "Si vous ne mettez pas le prix, il sera ajouté automatiquement à la fin.",
+        "tones": {
+            "custom": "Personnalisé",
+            "standard": "Standard",
+            "friendly": "Amical / Sympa",
+            "professional": "Professionnel",
+            "minimalist": "Direct / Minimaliste"
+        }
+    },
+    "negotiation": {
+        "reactions": {
+            "SHOCKED": [
+                "Cette offre est nettement inférieure à nos attentes. Cependant, nous pouvons vous proposer {{price}} €.",
+                "Nous ne pouvons malheureusement pas accepter une offre si basse. Le produit mérite mieux. Je vous propose {{price}} €.",
+                "Ce prix est trop éloigné de la valeur de l'article. Nous pourrions descendre à {{price}} €.",
+                "Votre offre est un peu trop agressive. Pouvons-nous nous accorder sur {{price}} € ?",
+                "Nous sommes ouverts à la négociation, mais ce montant est insuffisant. Que dites-vous de {{price}} € ?"
+            ],
+            "LOW": [
+                "C'est un effort appréciable, mais nous ne pouvons pas descendre à ce niveau. Notre meilleure offre est {{price}} €.",
+                "Nous nous rapprochons, mais ce prix reste en dessous de notre limite. Je peux vous le laisser à {{price}} €.",
+                "Je ne peux pas valider ce montant, mais je suis sûr que nous pouvons trouver un accord à {{price}} €.",
+                "Votre offre est intéressante mais encore un peu juste. Je vous propose {{price}} €.",
+                "Nous y sommes presque. Un petit effort supplémentaire ? Je peux descendre à {{price}} €."
+            ],
+            "CLOSE": [
+                "Nous sommes très proches d'un accord. Encore un petit pas vers {{price}} € ?",
+                "Votre offre est tentante. Si vous acceptez {{price}} €, nous avons un deal.",
+                "Nous touchons au but. Seriez-vous d'accord pour {{price}} € ?",
+                "L'écart est minime. Je peux vous faire une ultime proposition à {{price}} €.",
+                "C'est presque validé. Accordons-nous sur {{price}} €."
+            ],
+            "SUCCESS": [
+                "C'est entendu. Nous acceptons votre offre avec plaisir.",
+                "Accord conclu. Vous bénéficiez de ce tarif préférentiel.",
+                "C'est une offre équitable. Nous sommes ravis de l'accepter.",
+                "Proposition validée. Merci pour cette négociation constructive.",
+                "C'est d'accord pour nous. Profitez bien de votre achat."
+            ],
+            "HIGH": [
+                "Inutile de proposer plus, le prix actuel est de {{price}} €.",
+                "Le prix affiché est déjà de {{price}} €, vous ne paierez pas plus cher.",
+                "Notre prix est de {{price}} €, nous ne prenons pas de surenchère."
+            ],
+            "invalid_offer": "Je n'ai pas compris votre prix. Pouvez-vous me donner un montant (ex: 45) ?",
+            "sale_restriction": "Désolé, je ne peux pas négocier sur les articles déjà soldés.",
+            "min_limit_reached": "Désolé, je ne peux pas descendre plus bas que {{price}} €. C'est mon dernier prix."
+        }
+    },
+    "products": {
+        "title": "Produits & Collections",
+        "subtitle": "Gérez les rabais pour des produits ou collections spécifiques.",
+        "specific_rules": "Règles Spécifiques",
+        "add_product": "Ajouter Produit",
+        "add_collection": "Ajouter Collection",
+        "search_placeholder": "Nom du produit ou collection...",
+        "no_results": "Aucun résultat trouvé.",
+        "no_rules": "Aucune règle définie. Ajoutez un produit ou une collection.",
+        "rule_singular": "règle",
+        "rule_plural": "règles",
+        "enabled": "Activé",
+        "disabled": "Désactivé",
+        "activate": "Activer",
+        "deactivate": "Désactiver",
+        "delete": "Supprimer",
+        "max_discount": "Rabais Max",
+        "min_accepted_price": "Prix Minimum Accepté",
+        "base_price": "Prix de base",
+        "modify_rule": "Modifier la règle pour"
+    },
+    "parameters": {
+        "email_settings": "Configuration Email (Gmail)",
+        "gmail_user": "Adresse Gmail",
+        "gmail_user_help": "L'adresse email qui enverra les réponses.",
+        "gmail_password": "Mot de passe d'application",
+        "gmail_password_help": "Générez un mot de passe d'application dans votre compte Google > Sécurité."
+    },
+    "nav": {
+        "dashboard": "Tableau de Bord",
+        "rules": "Règles",
+        "products": "Mes Produits",
+        "offers": "Offres en attente",
+        "customization": "Personnalisation",
+        "parameters": "Paramètres"
+    },
+    "offers": {
+        "title": "Offres en attente",
+        "empty_heading": "Aucune offre en attente",
+        "empty_body": "Les offres nécessitant une validation manuelle apparaîtront ici.",
+        "accept": "Accepter",
+        "reject": "Refuser",
+        "counter": "Contre-offre",
+        "counter_modal_title": "Proposer un nouveau prix",
+        "counter_instruction": "Le client a proposé {{price}}€. Proposez un autre montant à {{email}}.",
+        "new_price": "Nouveau Prix (€)",
+        "send_counter": "Envoyer la proposition",
+        "cancel": "Annuler"
+    }
+}

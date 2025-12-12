@@ -33,6 +33,7 @@ model Shop {
   shopUrl     String   @unique
   accessToken String?  // Optional because sometimes we might just want to track the shop
   isActive      Boolean  @default(false)
+  autoNegotiation Boolean @default(true)
   maxRounds     Int      @default(3)
   strategy      String   @default("moderate") // 'aggressive', 'moderate', 'conciliatory'
   allowSaleItems Boolean @default(true)
@@ -45,6 +46,8 @@ model Shop {
   enableExitIntent Boolean @default(false)
   rules         Rule[]
   offers      Offer[]
+  gmailUser     String?
+  gmailAppPassword String?
   createdAt   DateTime @default(now())
 }
 
@@ -72,5 +75,9 @@ model Offer {
   productTitle  String?
   productId     String?
   originalPrice Float?
+  isConverted   Boolean  @default(false)
+  convertedAt   DateTime?
+  orderId       String?
   createdAt     DateTime @default(now())
+  counterPrice  Float?
 }

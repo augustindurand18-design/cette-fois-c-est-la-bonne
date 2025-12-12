@@ -5,12 +5,12 @@
   "stylesheet": "offer.css",
   "javascript": "offer.js",
   "settings": [
-    { "type": "text", "id": "btn_text", "label": "Texte du bouton", "default": "Faire une offre" },
-    { "type": "range", "id": "btn_height", "min": 30, "max": 100, "step": 1, "unit": "px", "label": "Hauteur", "default": 44 },
-    { "type": "color", "id": "btn_color", "label": "Couleur du bouton", "default": "#000000" },
-    { "type": "color", "id": "btn_text_color", "label": "Couleur du texte", "default": "#ffffff" },
-    { "type": "range", "id": "btn_border_radius", "min": 0, "max": 40, "step": 1, "unit": "px", "label": "Arrondi des bords", "default": 4 },
-    { "type": "range", "id": "btn_font_size", "min": 12, "max": 24, "step": 1, "unit": "px", "label": "Taille du texte", "default": 16 }
+    { "type": "text", "id": "btn_text", "label": "Button Text", "default": "Make an offer" },
+    { "type": "range", "id": "btn_height", "min": 30, "max": 100, "step": 1, "unit": "px", "label": "Height", "default": 44 },
+    { "type": "color", "id": "btn_color", "label": "Button Color", "default": "#000000" },
+    { "type": "color", "id": "btn_text_color", "label": "Text Color", "default": "#ffffff" },
+    { "type": "range", "id": "btn_border_radius", "min": 0, "max": 40, "step": 1, "unit": "px", "label": "Border Radius", "default": 4 },
+    { "type": "range", "id": "btn_font_size", "min": 12, "max": 24, "step": 1, "unit": "px", "label": "Text Size", "default": 16 }
   ]
 }
 {% endschema %}
@@ -23,7 +23,7 @@
   <div id="smart-offer-modal" class="smart-offer-modal" style="display: none;">
     <div class="smart-offer-chat-container">
       <div class="smart-offer-header">
-        <span class="smart-offer-title">Négociation en direct</span>
+        <span class="smart-offer-title">Live Negotiation</span>
         <span class="smart-offer-close">&times;</span>
       </div>
       
@@ -32,7 +32,7 @@
       </div>
 
       <div class="smart-offer-input-area">
-        <input type="text" id="smart-offer-input" placeholder="Votre offre (ex: Je vous propose 45€)..." />
+        <input type="text" id="smart-offer-input" placeholder="Your offer (e.g. I offer 45€)..." />
         <button id="smart-offer-submit">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
             <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/>

@@ -1,40 +1,5 @@
 import db from "../db.server";
 
-const REACTIONS = {
-    SHOCKED: [ // < 50% of original
-        "Cette offre est nettement inférieure à nos attentes. Cependant, nous pouvons vous proposer {price} €.",
-        "Nous ne pouvons malheureusement pas accepter une offre si basse. Le produit mérite mieux. Je vous propose {price} €.",
-        "Ce prix est trop éloigné de la valeur de l'article. Nous pourrions descendre à {price} €.",
-        "Votre offre est un peu trop agressive. Pouvons-nous nous accorder sur {price} € ?",
-        "Nous sommes ouverts à la négociation, mais ce montant est insuffisant. Que dites-vous de {price} € ?"
-    ],
-    LOW: [ // < Min Acceptable
-        "C'est un effort appréciable, mais nous ne pouvons pas descendre à ce niveau. Notre meilleure offre est {price} €.",
-        "Nous nous rapprochons, mais ce prix reste en dessous de notre limite. Je peux vous le laisser à {price} €.",
-        "Je ne peux pas valider ce montant, mais je suis sûr que nous pouvons trouver un accord à {price} €.",
-        "Votre offre est intéressante mais encore un peu juste. Je vous propose {price} €.",
-        "Nous y sommes presque. Un petit effort supplémentaire ? Je peux descendre à {price} €."
-    ],
-    CLOSE: [ // Within 10% of Min Acceptable
-        "Nous sommes très proches d'un accord. Encore un petit pas vers {price} € ?",
-        "Votre offre est tentante. Si vous acceptez {price} €, nous avons un deal.",
-        "Nous touchons au but. Seriez-vous d'accord pour {price} € ?",
-        "L'écart est minime. Je peux vous faire une ultime proposition à {price} €.",
-        "C'est presque validé. Accordons-nous sur {price} €."
-    ],
-    SUCCESS: [ // Accepted
-        "C'est entendu. Nous acceptons votre offre avec plaisir.",
-        "Accord conclu. Vous bénéficiez de ce tarif préférentiel.",
-        "C'est une offre équitable. Nous sommes ravis de l'accepter.",
-        "Proposition validée. Merci pour cette négociation constructive.",
-        "C'est d'accord pour nous. Profitez bien de votre achat."
-    ],
-    HIGH: [ // Should be prevented normally
-        "Inutile de proposer plus, le prix actuel est de {price} €.",
-        "Le prix affiché est déjà de {price} €, vous ne paierez pas plus cher.",
-        "Notre prix est de {price} €, nous ne prenons pas de surenchère."
-    ]
-};
 
 const RATE_LIMIT_WINDOW_SECONDS = 60;
 const MAX_OFFERS_PER_WINDOW = 10;
@@ -42,11 +7,42 @@ const MAX_OFFERS_PER_WINDOW = 10;
 export const NegotiationService = {
     /**
      * Get a random reaction message for a category
+     * @param {string} category 
+     * @param {string|number} price 
+     * @param {Function} t - i18next translation function
      */
-    getMessage(category, price = null) {
-        const messages = REACTIONS[category] || REACTIONS.LOW;
+    getMessage(category, price = null, t) {
+        // Fallback to LOW if category invalid
+        const validCategories = ['SHOCKED', 'LOW', 'CLOSE', 'SUCCESS', 'HIGH'];
+        const safeCategory = validCategories.includes(category) ? category : 'LOW';
+
+        // Helper to get random array element from resources
+        // We need to know the length of the array in the translation file.
+        // i18next returnObjects: true is one way, or we can just assume size 5.
+        // Better: t returns the array if returnObjects is true.
+
+        const messages = t(`negotiation.reactions.${safeCategory}`, { returnObjects: true });
+
+        // Safety check if messages is not an array (e.g. key missing)
+        if (!Array.isArray(messages)) {
+            return "Message unavailable.";
+        }
+
         const msg = messages[Math.floor(Math.random() * messages.length)];
-        return price ? msg.replace("{price}", price) : msg;
+        return msg.replace("{{price}}", price); // i18next interpolation is usually {{val}}, but let's stick to simple replacement or use t's feature
+        // Actually, let's use t's interpolation if we passed keys individually, 
+        // but here we picked a string from an array. Converting {{price}} manually is fine 
+        // OR we could pass price to t, but t returns the raw array. 
+        // Let's rely on t returning the array of string with {{price}} placeholder, 
+        // and we assume the frontend or this service replaces it. 
+        // Wait, standard i18next interpolation happens inside t. 
+        // If we get the array, it's already "translated" but headers might be raw?
+        // Actually, t('key', { returnObjects: true }) returns the array of STRINGS.
+        // Those strings might contain {{price}}. We should replace it using the variable.
+
+        // Correct approach with i18next for arrays:
+        // You usually can't interpolate into the array easily with a single t call.
+        // So manual replacement is the way to go for this specific logic (random pick).
     },
 
     /**
@@ -55,7 +51,7 @@ export const NegotiationService = {
      * @param {string} shopId 
      */
     async checkRateLimit(sessionId, shopId) {
-        if (!sessionId) return; // Should ideally always have one
+        if (!sessionId) return;
 
         const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_SECONDS * 1000);
 
@@ -70,6 +66,8 @@ export const NegotiationService = {
         });
 
         if (recentOffers >= MAX_OFFERS_PER_WINDOW) {
+            // This error message should also be translated, but errors are often hardcoded for now.
+            // Let's keep it simple or throw a specific error code.
             throw new Error("Trop de tentatives. Veuillez patienter une minute.");
         }
     },
@@ -136,3 +134,4 @@ export const NegotiationService = {
         return 'LOW';
     }
 };
+

@@ -39,6 +39,8 @@ export const loader = async ({ request }) => {
         botSuccessMsg: shop.botSuccessMsg,
         widgetColor: shop.widgetColor,
         botIcon: shop.botIcon,
+        widgetColor: shop.widgetColor,
+        botIcon: shop.botIcon,
     };
 };
 
@@ -51,46 +53,20 @@ export const action = async ({ request }) => {
     const botSuccessMsg = formData.get("botSuccessMsg");
     const widgetColor = formData.get("widgetColor");
     const botIcon = formData.get("botIcon");
+    const updateData = {
+        botWelcomeMsg,
+        botRejectMsg,
+        botSuccessMsg,
+        widgetColor,
+        botIcon,
+    };
 
     await db.shop.update({
         where: { shopUrl: session.shop },
-        data: {
-            botWelcomeMsg,
-            botRejectMsg,
-            botSuccessMsg,
-            widgetColor,
-            botIcon,
-        },
+        data: updateData,
     });
 
     return { success: true };
-};
-
-const TONE_PRESETS = {
-    standard: {
-        label: "Standard",
-        welcome: "Bonjour ! 👋 Je peux vous faire une remise si vous me proposez un prix raisonnable. Quel est votre prix ?",
-        reject: "C'est un peu juste... Je peux vous le faire à {price} €.",
-        success: "C'est d'accord pour {price}€ ! 🎉"
-    },
-    friendly: {
-        label: "Amical",
-        welcome: "Salut ! 👋 Je suis d'humeur négociatrice aujourd'hui. Fais-moi ta meilleure offre !",
-        reject: "Oula, c'est bas ! 😅 Je peux descendre à {price} € pour te faire plaisir.",
-        success: "Top ! Vendu pour {price}€ ! Fonce ! 🚀"
-    },
-    professional: {
-        label: "Professionnel",
-        welcome: "Bonjour. Nous sommes ouverts à la discussion. Quelle est votre proposition de prix ?",
-        reject: "Cette offre est en dessous de notre seuil. Nous pouvons vous proposer {price} €.",
-        success: "Votre offre de {price}€ est acceptée. Merci de votre confiance."
-    },
-    minimalist: {
-        label: "Direct / Minimaliste",
-        welcome: "Faites une offre.",
-        reject: "Trop bas. Min: {price} €.",
-        success: "Ok pour {price}€."
-    }
 };
 
 export default function CustomizationPage() {
@@ -98,7 +74,42 @@ export default function CustomizationPage() {
     const fetcher = useFetcher();
     const { t } = useTranslation();
 
+    const TONE_PRESETS = {
+        standard: {
+            label: t('customization.tones.standard'),
+            welcome: t('customization.presets.standard.welcome'),
+            reject: t('customization.presets.standard.reject'),
+            success: t('customization.presets.standard.success')
+        },
+        friendly: {
+            label: t('customization.tones.friendly'),
+            welcome: t('customization.presets.friendly.welcome'),
+            reject: t('customization.presets.friendly.reject'),
+            success: t('customization.presets.friendly.success')
+        },
+        professional: {
+            label: t('customization.tones.professional'),
+            welcome: t('customization.presets.professional.welcome'),
+            reject: t('customization.presets.professional.reject'),
+            success: t('customization.presets.professional.success')
+        },
+        minimalist: {
+            label: t('customization.tones.minimalist'),
+            welcome: t('customization.presets.minimalist.welcome'),
+            reject: t('customization.presets.minimalist.reject'),
+            success: t('customization.presets.minimalist.success')
+        }
+    };
+
     // Initial Values
+    // Note: If loaderData has values, we use them. If not, we fallback to standard preset.
+    // BUT since we just changed presets to English in 'en', if the DB has French values stored, 
+    // the user will still see French in the inputs by default unless we detect it's "standard" french 
+    // and replace it. But we cannot easily know if it's the "original" french.
+    // The user said "admin en anglais". The texts that come from DB (user saved settings) 
+    // are content, not UI. But if the user hasn't saved anything yet, or wants to reset, 
+    // they should see English presets.
+    // For now, new selection of presets will yield English.
     const initialWelcome = loaderData.botWelcomeMsg || TONE_PRESETS.standard.welcome;
     const initialReject = loaderData.botRejectMsg || TONE_PRESETS.standard.reject;
     const initialSuccess = loaderData.botSuccessMsg || TONE_PRESETS.standard.success;
@@ -162,16 +173,14 @@ export default function CustomizationPage() {
     };
 
     const handleSave = () => {
-        fetcher.submit(
-            {
-                botWelcomeMsg: welcomeMsg,
-                botRejectMsg: rejectMsg,
-                botSuccessMsg: successMsg,
-                widgetColor: color,
-                botIcon: botIcon
-            },
-            { method: "POST" }
-        );
+        let formData = new FormData();
+        formData.append("botWelcomeMsg", welcomeMsg);
+        formData.append("botRejectMsg", rejectMsg);
+        formData.append("botSuccessMsg", successMsg);
+        formData.append("widgetColor", color);
+        formData.append("botIcon", botIcon);
+
+        fetcher.submit(formData, { method: "POST" });
     };
 
     return (
@@ -363,48 +372,53 @@ export default function CustomizationPage() {
                                 </div>
                             </div>
 
-                            {/* Content Section (Bottom) */}
-                            <FormLayout>
-                                <Select
-                                    label={t('customization.tone_label')}
-                                    options={[
-                                        { label: t('customization.tones.custom'), value: 'custom' },
-                                        { label: t('customization.tones.standard'), value: 'standard' },
-                                        { label: t('customization.tones.friendly'), value: 'friendly' },
-                                        { label: t('customization.tones.professional'), value: 'professional' },
-                                        { label: t('customization.tones.minimalist'), value: 'minimalist' },
-                                    ]}
-                                    onChange={handleToneChange}
-                                    value={tone}
-                                    helpText={t('customization.tone_help')}
-                                />
 
-                                <TextField
-                                    label={t('customization.welcome_msg')}
-                                    value={welcomeMsg}
-                                    onChange={(val) => { setWelcomeMsg(val); setTone('custom'); }}
-                                    autoComplete="off"
-                                    multiline={2}
-                                />
 
-                                <TextField
-                                    label={t('customization.counter_msg')}
-                                    value={rejectMsg}
-                                    onChange={(val) => { setRejectMsg(val); setTone('custom'); }}
-                                    autoComplete="off"
-                                    multiline={2}
-                                    helpText={t('customization.msg_help')}
-                                />
+                            {/* Message Settings */}
+                            <Box paddingBlockStart="400" borderBlockStartWidth="025" borderColor="border-subdued">
+                                <Text variant="headingMd" as="h3" paddingBlockEnd="400">Bot Settings</Text>
+                                <FormLayout>
+                                    <Select
+                                        label={t('customization.tone_label')}
+                                        options={[
+                                            { label: t('customization.tones.custom'), value: 'custom' },
+                                            { label: t('customization.tones.standard'), value: 'standard' },
+                                            { label: t('customization.tones.friendly'), value: 'friendly' },
+                                            { label: t('customization.tones.professional'), value: 'professional' },
+                                            { label: t('customization.tones.minimalist'), value: 'minimalist' },
+                                        ]}
+                                        onChange={handleToneChange}
+                                        value={tone}
+                                        helpText={t('customization.tone_help')}
+                                    />
 
-                                <TextField
-                                    label={t('customization.success_msg')}
-                                    value={successMsg}
-                                    onChange={(val) => { setSuccessMsg(val); setTone('custom'); }}
-                                    autoComplete="off"
-                                    multiline={2}
-                                    helpText={t('customization.msg_help')}
-                                />
-                            </FormLayout>
+                                    <TextField
+                                        label={t('customization.welcome_msg')}
+                                        value={welcomeMsg}
+                                        onChange={(val) => { setWelcomeMsg(val); setTone('custom'); }}
+                                        autoComplete="off"
+                                        multiline={2}
+                                    />
+
+                                    <TextField
+                                        label={t('customization.counter_msg')}
+                                        value={rejectMsg}
+                                        onChange={(val) => { setRejectMsg(val); setTone('custom'); }}
+                                        autoComplete="off"
+                                        multiline={2}
+                                        helpText={t('customization.msg_help')}
+                                    />
+
+                                    <TextField
+                                        label={t('customization.success_msg')}
+                                        value={successMsg}
+                                        onChange={(val) => { setSuccessMsg(val); setTone('custom'); }}
+                                        autoComplete="off"
+                                        multiline={2}
+                                        helpText={t('customization.msg_help')}
+                                    />
+                                </FormLayout>
+                            </Box>
                         </BlockStack>
                     </Card>
                 </Layout.Section>

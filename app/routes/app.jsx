@@ -12,19 +12,24 @@ export const loader = async ({ request }) => {
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };
 
+import { useTranslation } from "react-i18next";
+
 export default function App() {
   const { apiKey } = useLoaderData();
+  const { t } = useTranslation();
 
   return (
     <AppProvider embedded apiKey={apiKey}>
       <PolarisAppProvider>
         <ui-nav-menu>
           <a href="/app" rel="home">
-            Tableau de Bord
+            {t('nav.dashboard')}
           </a>
-          <a href="/app/rules">Règles</a>
-          <a href="/app/products">Produits</a>
-          <a href="/app/customization">Personnalisation</a>
+          <a href="/app/rules">{t('nav.rules')}</a>
+          <a href="/app/products">{t('nav.products')}</a>
+          <a href="/app/offers">{t('nav.offers')}</a>
+          <a href="/app/customization">{t('nav.customization')}</a>
+          <a href="/app/parameters">{t('nav.parameters')}</a>
         </ui-nav-menu>
         <Outlet />
       </PolarisAppProvider>

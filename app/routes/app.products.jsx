@@ -16,7 +16,10 @@ import {
     Badge,
     Frame,
     Toast,
+    Icon,
+    Thumbnail,
 } from "@shopify/polaris";
+import { ImageIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { useEffect } from "react";
@@ -61,6 +64,11 @@ export const loader = async ({ request }) => {
                       featuredImage {
                         url
                       }
+                      images(first: 1) {
+                        nodes {
+                          url
+                        }
+                      }
                       priceRangeV2 {
                         minVariantPrice {
                           amount
@@ -95,9 +103,10 @@ export const loader = async ({ request }) => {
         let details = {};
         if (r.productId) {
             const product = nodes.find(n => n && n.id === r.productId);
+            const hasImage = product?.featuredImage?.url || product?.images?.nodes?.[0]?.url;
             details = {
                 title: product ? product.title : `Produit: ${r.productId.split('/').pop()}`,
-                imageUrl: product?.featuredImage?.url,
+                imageUrl: hasImage,
                 price: product?.priceRangeV2?.minVariantPrice?.amount
             };
         } else if (r.collectionId) {
@@ -232,9 +241,12 @@ export const action = async ({ request }) => {
     return { success: false };
 };
 
+import { useTranslation } from "react-i18next";
+
 export default function ProductsPage() {
     const loaderData = useLoaderData();
     const fetcher = useFetcher();
+    const { t } = useTranslation();
 
     // Toast State
     const [toastActive, setToastActive] = useState(false);
@@ -446,10 +458,10 @@ export default function ProductsPage() {
         <Frame>
             {toastMarkup}
             <Page
-                title="Produits & Collections"
-                subtitle="Gérez les rabais pour des produits ou collections spécifiques."
+                title={t('products.title')}
+                subtitle={t('products.subtitle')}
                 primaryAction={{
-                    content: fetcher.state !== "idle" ? "Enregistrement..." : "Enregistrer",
+                    content: fetcher.state !== "idle" ? t('common.saving') : t('common.save'),
                     onAction: handleSave,
                     disabled: !isDirty || fetcher.state !== "idle",
                 }}
@@ -459,30 +471,30 @@ export default function ProductsPage() {
                         <Card>
                             <BlockStack gap="400">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                                    <Text variant="headingMd">Règles Spécifiques ({loaderData.rules.length})</Text>
+                                    <Text variant="headingMd">{t('products.specific_rules')} ({loaderData.rules.length})</Text>
                                     <InlineStack gap="200">
-                                        <Button onClick={handleAddProduct}>Ajouter Produit</Button>
-                                        <Button onClick={handleAddCollection}>Ajouter Collection</Button>
+                                        <Button onClick={handleAddProduct}>{t('products.add_product')}</Button>
+                                        <Button onClick={handleAddCollection}>{t('products.add_collection')}</Button>
                                     </InlineStack>
                                 </div>
 
                                 <TextField
-                                    label="Rechercher"
+                                    label={t('products.search_placeholder')} // Use as placeholder mostly
                                     value={searchTerm}
                                     onChange={setSearchTerm}
                                     autoComplete="off"
-                                    placeholder="Nom du produit ou collection..."
+                                    placeholder={t('products.search_placeholder')}
                                     labelHidden
                                     prefix="🔍"
                                 />
 
                                 {filteredRules.length === 0 ? (
                                     <div style={{ textAlign: 'center', padding: '20px', color: '#6d7175' }}>
-                                        <Text>{searchTerm ? "Aucun résultat trouvé." : "Aucune règle définie. Ajoutez un produit ou une collection."}</Text>
+                                        <Text>{searchTerm ? t('products.no_results') : t('products.no_rules')}</Text>
                                     </div>
                                 ) : (
                                     <ResourceList
-                                        resourceName={{ singular: 'règle', plural: 'règles' }}
+                                        resourceName={{ singular: t('products.rule_singular'), plural: t('products.rule_plural') }}
                                         items={filteredRules}
                                         renderItem={(item) => {
                                             const discountPercent = specificRuleValues[item.id] !== undefined
@@ -508,17 +520,21 @@ export default function ProductsPage() {
                                             return (
                                                 <ResourceItem
                                                     id={item.id}
-                                                    accessibilityLabel={`Modifier la règle pour ${item.title}`}
+                                                    accessibilityLabel={`${t('products.modify_rule')} ${item.title}`}
                                                     media={
-                                                        <Avatar customer size="medium" name={item.title} source={item.imageUrl} />
+                                                        <Thumbnail
+                                                            source={item.imageUrl || ImageIcon}
+                                                            alt={item.title}
+                                                            size="medium"
+                                                        />
                                                     }
                                                     shortcutActions={[
                                                         {
-                                                            content: isEnabled ? 'Désactiver' : 'Activer',
+                                                            content: isEnabled ? t('products.deactivate') : t('products.activate'),
                                                             onAction: () => handleToggleRule(item.id, isEnabled)
                                                         },
                                                         {
-                                                            content: 'Supprimer',
+                                                            content: t('products.delete'),
                                                             destructive: true,
                                                             onAction: () => handleDeleteRule(item.id)
                                                         }
@@ -529,13 +545,13 @@ export default function ProductsPage() {
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                             <Text variant="bodyMd" fontWeight="bold">{item.title}</Text>
                                                             <Badge tone={isEnabled ? "success" : "critical"}>
-                                                                {isEnabled ? "Activé" : "Désactivé"}
+                                                                {isEnabled ? t('products.enabled') : t('products.disabled')}
                                                             </Badge>
                                                         </div>
 
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px' }}>
                                                             <div style={{ flex: 1 }}>
-                                                                <Text variant="bodySm">Rabais Max: {discountPercent}%</Text>
+                                                                <Text variant="bodySm">{t('products.max_discount')}: {discountPercent}%</Text>
                                                                 <RangeSlider
                                                                     output
                                                                     min={0}
@@ -551,7 +567,7 @@ export default function ProductsPage() {
                                                             {item.price && originalPrice && (
                                                                 <div style={{ width: '150px' }}>
                                                                     <TextField
-                                                                        label="Prix Minimum Accepté"
+                                                                        label={t('products.min_accepted_price')}
                                                                         type="number"
                                                                         step={0.01}
                                                                         value={
@@ -563,7 +579,7 @@ export default function ProductsPage() {
                                                                         prefix="€"
                                                                         disabled={!isEnabled}
                                                                         autoComplete="off"
-                                                                        helpText={`Prix de base : ${originalPrice.toFixed(2)} €`}
+                                                                        helpText={`${t('products.base_price')} : ${originalPrice.toFixed(2)} €`}
                                                                     />
                                                                 </div>
                                                             )}

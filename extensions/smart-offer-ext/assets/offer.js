@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Default Config
     let appSettings = {
-        botWelcomeMsg: "Bonjour ! 👋 Je peux vous faire une remise si vous me proposez un prix raisonnable. Quel est votre prix ?",
+        botWelcomeMsg: "Hello! 👋 I can offer you a discount if you propose a reasonable price. What is your price?",
         widgetColor: "#000000"
     };
 
@@ -67,6 +67,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Chat State
     let isThinking = false;
     let attemptCount = 0;
+    let pendingManualPrice = null; // Store price when waiting for email
 
     const scrollToBottom = () => {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -202,13 +203,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const handleSubmit = async () => {
         if (isThinking) return;
 
-        const price = input.value;
-        if (!price) return;
+        const inputValue = input.value;
+        if (!inputValue) return;
 
         attemptCount++; // Increment attempt
 
         // User Message
-        addMessage(price, "user");
+        addMessage(inputValue, "user");
         input.value = "";
 
         isThinking = true;
@@ -228,18 +229,28 @@ document.addEventListener('DOMContentLoaded', function () {
             sessionStorage.setItem("smartOfferSessionId", sessionId);
         }
 
+        // Determine payload based on state
+        let payload = {
+            productId: window.smartOfferConfig.productId,
+            shopUrl: window.smartOfferConfig.shopUrl,
+            round: attemptCount,
+            sessionId: sessionId
+        };
+
+        if (pendingManualPrice) {
+            payload.offerPrice = pendingManualPrice;
+            payload.customerEmail = inputValue;
+        } else {
+            payload.offerPrice = inputValue;
+            // No email yet
+        }
+
         try {
             const [response] = await Promise.all([
                 fetch('/apps/negotiate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        productId: window.smartOfferConfig.productId,
-                        offerPrice: price,
-                        shopUrl: window.smartOfferConfig.shopUrl,
-                        round: attemptCount,
-                        sessionId: sessionId // Send Session ID
-                    })
+                    body: JSON.stringify(payload)
                 }),
                 wait(thinkingTime) // Ensure we wait at least this long
             ]);
@@ -252,16 +263,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     // Trigger Confetti
                     launchConfetti();
 
-                    addMessage(data.message || `C'est d'accord pour <b>${price}€</b> ! 🎉`, "bot", true);
+                    addMessage(data.message || `It's a deal for <b>${payload.offerPrice}€</b> ! 🎉`, "bot", true);
 
                     // Refined Action Button
                     const actionBtn = document.createElement("button");
                     actionBtn.className = "smart-offer-action-btn";
-                    actionBtn.innerText = "Ajouter au panier & payer";
+                    actionBtn.innerText = "Add to Cart & Pay";
 
                     // Logic to add to cart and redirect
                     actionBtn.onclick = async () => {
-                        actionBtn.innerText = "Ajout en cours...";
+                        actionBtn.innerText = "Adding...";
                         actionBtn.disabled = true;
                         actionBtn.style.opacity = "0.8";
 
@@ -284,7 +295,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             });
 
                             if (addToCartRes.ok) {
-                                actionBtn.innerText = "Redirection vers le paiement...";
+                                actionBtn.innerText = "Redirecting to checkout...";
                                 // 2. Redirect to Checkout with Discount Code
                                 window.location.href = `/discount/${data.code}?redirect=/checkout`;
                             } else {
@@ -292,7 +303,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             }
                         } catch (e) {
                             console.error(e);
-                            actionBtn.innerText = "Erreur - Réessayer";
+                            actionBtn.innerText = "Error - Retry";
                             actionBtn.disabled = false;
                             actionBtn.style.opacity = "1";
                         }
@@ -322,13 +333,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     // Countdown logic
                     let timeLeft = 300; // 5 minutes to create urgency
-                    const originalBtnText = "Ajouter au panier & payer";
+                    const originalBtnText = "Add to Cart & Pay";
 
                     const updateTimer = () => {
                         const minutes = Math.floor(timeLeft / 60);
                         const seconds = timeLeft % 60;
                         const timeString = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-                        if (!actionBtn.disabled || actionBtn.innerText.includes("Ajouter")) {
+                        if (!actionBtn.disabled || actionBtn.innerText.includes("Add")) {
                             actionBtn.innerText = `${originalBtnText} (${timeString})`;
                         }
                     };
@@ -338,7 +349,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         timeLeft--;
                         if (timeLeft <= 0) {
                             clearInterval(timerInterval);
-                            actionBtn.innerText = "Offre expirée";
+                            actionBtn.innerText = "Offer expired";
                             actionBtn.disabled = true;
                             actionBtn.onclick = null;
                         } else {
@@ -348,6 +359,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
                     // Disable further input
+                    input.disabled = true;
+                    submitBtn.style.display = 'none';
+
+                } else if (data.status === 'REQUEST_EMAIL') {
+                    // Manual Mode: Bot asks for email
+                    pendingManualPrice = payload.offerPrice;
+                    addMessage(data.message, "bot");
+
+                    input.placeholder = "name@example.com";
+                    input.type = "email";
+                    input.focus();
+
+                } else if (data.status === 'MANUAL_COMPLETED') {
+                    // Manual Mode: Finished
+                    addMessage(data.message, "bot");
+
+                    // Reset or Close
+                    pendingManualPrice = null;
                     input.disabled = true;
                     submitBtn.style.display = 'none';
 
@@ -361,12 +390,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         setTimeout(() => container.classList.remove('smart-offer-shake'), 500);
                     }
 
-                    addMessage(data.message || `Hmm, c'est trop bas. Je peux descendre à ${data.counterPrice}€, pas moins.`, "bot");
+                    addMessage(data.message || `Hmm, that's too low. I can go down to ${data.counterPrice}€, no less.`, "bot");
 
                     if (data.counterPrice) {
                         const acceptBtn = document.createElement("button");
                         acceptBtn.className = "smart-offer-action-btn";
-                        acceptBtn.innerText = `Accepter la contre-offre (${data.counterPrice} €)`;
+                        acceptBtn.innerText = `Accept counter-offer (${data.counterPrice} €)`;
                         acceptBtn.style.marginTop = "8px";
 
                         acceptBtn.onclick = () => {
@@ -399,19 +428,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else if (data.status === 'CHAT') {
                     addMessage(data.message, "bot");
                 } else if (data.status === 'ERROR') {
-                    addMessage(data.error || "Une erreur s'est produite.", "bot");
+                    addMessage(data.error || "An error occurred.", "bot");
                 } else {
-                    addMessage("Une erreur s'est produite.", "bot");
+                    addMessage("An error occurred.", "bot");
                 }
 
             } else {
-                addMessage("Erreur de connexion.", "bot");
+                addMessage("Connection error.", "bot");
             }
 
         } catch (e) {
             console.error(e);
             removeLoading();
-            addMessage("Echec de l'envoi du message.", "bot");
+            addMessage("Failed to send message.", "bot");
         } finally {
             if (!input.disabled) {
                 isThinking = false;

@@ -1,23 +1,24 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
-import Backend from "i18next-http-backend";
+import en from "./locales/en/translation.json";
+import fr from "./locales/fr/translation.json";
 
 i18n
-    .use(Backend)
     .use(LanguageDetector)
     .use(initReactI18next)
     .init({
-        fallbackLng: "fr",
+        fallbackLng: "en",
         supportedLngs: ["en", "fr"],
+        resources: {
+            en: { translation: en },
+            fr: { translation: fr },
+        },
         interpolation: {
             escapeValue: false,
         },
         react: {
-            useSuspense: false, // simpler for now, avoids hydration mismatches if we don't have SSR setup perfectly
-        },
-        backend: {
-            loadPath: "/locales/{{lng}}/translation.json",
+            useSuspense: false,
         },
         detection: {
             order: ["shopify", "navigator", "htmlTag"],

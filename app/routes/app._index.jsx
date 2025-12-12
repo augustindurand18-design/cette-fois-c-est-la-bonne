@@ -263,7 +263,7 @@ export default function Index() {
     <Page
       title={t('dashboard.title')}
       primaryAction={{
-        content: fetcher.state === "loading" ? "Exportation..." : "Exporter CSV",
+        content: fetcher.state === "loading" ? t('common.exporting') : t('common.export_csv'),
         onAction: () => fetcher.load("/api/export-offers"),
         disabled: fetcher.state === "loading"
       }}
@@ -273,18 +273,18 @@ export default function Index() {
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
-              <Text variant="headingSm" as="h3">Filtres de période</Text>
+              <Text variant="headingSm" as="h3">{t('dashboard.period_filters')}</Text>
               <InlineGrid columns={period === "custom" ? ["oneThird", "twoThirds"] : "1fr"} gap="400">
                 <Select
-                  label="Période"
+                  label={t('dashboard.period')}
                   labelHidden
                   options={[
-                    { label: "Aujourd'hui", value: "today" },
-                    { label: "Hier", value: "yesterday" },
-                    { label: "3 derniers jours", value: "last_3d" },
-                    { label: "7 derniers jours", value: "last_7d" },
-                    { label: "30 derniers jours", value: "last_30d" },
-                    { label: "Personnalisé", value: "custom" },
+                    { label: t('dashboard.today'), value: "today" },
+                    { label: t('dashboard.yesterday'), value: "yesterday" },
+                    { label: t('dashboard.last_3d'), value: "last_3d" },
+                    { label: t('dashboard.last_7d'), value: "last_7d" },
+                    { label: t('dashboard.last_30d'), value: "last_30d" },
+                    { label: t('dashboard.custom'), value: "custom" },
                   ]}
                   onChange={handlePeriodChange}
                   value={period}
@@ -292,21 +292,21 @@ export default function Index() {
                 {period === "custom" && (
                   <InlineStack gap="400" align="start">
                     <TextField
-                      label="Début"
+                      label={t('dashboard.start_date')}
                       type="date"
                       value={customStart}
                       onChange={(val) => setCustomStart(val)}
                       autoComplete="off"
                     />
                     <TextField
-                      label="Fin"
+                      label={t('dashboard.end_date')}
                       type="date"
                       value={customEnd}
                       onChange={(val) => setCustomEnd(val)}
                       autoComplete="off"
                     />
                     <div style={{ marginTop: '28px' }}>
-                      <Button onClick={handleCustomDateChange} variant="primary">Appliquer</Button>
+                      <Button onClick={handleCustomDateChange} variant="primary">{t('common.apply')}</Button>
                     </div>
                   </InlineStack>
                 )}
@@ -320,7 +320,7 @@ export default function Index() {
           <InlineGrid columns={3} gap="400">
             <Card>
               <BlockStack gap="200">
-                <Text variant="headingSm" as="h3" tone="subdued">Revenus Générés</Text>
+                <Text variant="headingSm" as="h3" tone="subdued">{t('dashboard.revenue_generated')}</Text>
                 <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
                   <Text variant="headingLg" as="p">{stats.revenue.toFixed(2)} €</Text>
                   <div style={{ width: '80px', height: '30px' }}>
@@ -331,14 +331,14 @@ export default function Index() {
             </Card>
             <Card>
               <BlockStack gap="200">
-                <Text variant="headingSm" as="h3" tone="subdued">Taux d'Acceptation</Text>
+                <Text variant="headingSm" as="h3" tone="subdued">{t('dashboard.acceptance_rate')}</Text>
                 <Text variant="headingLg" as="p" tone="success">{stats.acceptanceRate}%</Text>
-                <Text variant="bodyXs" tone="subdued">{stats.total} offres totales</Text>
+                <Text variant="bodyXs" tone="subdued">{stats.total} {t('dashboard.total_offers_text')}</Text>
               </BlockStack>
             </Card>
             <Card>
               <BlockStack gap="200">
-                <Text variant="headingSm" as="h3" tone="subdued">Rabais Moyen</Text>
+                <Text variant="headingSm" as="h3" tone="subdued">{t('dashboard.avg_discount')}</Text>
                 <Text variant="headingLg" as="p" tone="highlight">{stats.avgDiscount}%</Text>
               </BlockStack>
             </Card>
