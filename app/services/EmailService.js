@@ -19,7 +19,7 @@ export const EmailService = {
 
         try {
             const info = await transporter.sendMail({
-                from: `"Smart Offer Bot" <${user}>`,
+                from: `"${credentials.name || 'Smart Offer Bot'}" <${user}>`,
                 to: to,
                 subject: subject,
                 html: html,
@@ -33,35 +33,59 @@ export const EmailService = {
         }
     },
 
-    async sendOfferAccepted(credentials, to, code, endsAt, productTitle) {
+    async sendOfferAccepted(credentials, to, code, endsAt, productTitle, checkoutUrl) {
         const html = `
-            <h2>Félicitations ! Votre offre a été acceptée.</h2>
-            <p>Vous avez négocié avec succès pour le produit : <strong>${productTitle}</strong>.</p>
-            <p>Voici votre code promotionnel unique :</p>
+            <h2>Congratulations! Your offer has been accepted.</h2>
+            <p>You successfully negotiated for the product: <strong>${productTitle}</strong>.</p>
+            <p>Here is your unique discount code:</p>
             <h1 style="color: green;">${code}</h1>
-            <p><strong>Attention :</strong> Ce code est valable uniquement jusqu'au : ${new Date(endsAt).toLocaleString()}.</p>
-            <p>Utilisez-le dès maintenant lors du paiement.</p>
+            <p><strong>Attention:</strong> This code is valid only until: ${new Date(endsAt).toLocaleString()}.</p>
+            
+            ${checkoutUrl ? `
+            <div style="margin: 30px 0;">
+                <a href="${checkoutUrl}" style="background-color: #008060; color: white; padding: 15px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+                    Buy now (discount applied)
+                </a>
+            </div>
+            ` : ''}
+
+            <p>Or use it manually at checkout.</p>
         `;
-        return this.sendEmail(credentials, { to, subject: "Votre offre a été acceptée ! 🎉", html });
+        return this.sendEmail(credentials, { to, subject: "Your offer has been accepted! 🎉", html });
     },
 
-    async sendOfferRejected(credentials, to, productTitle) {
+    async sendOfferRejected(credentials, to, productTitle, productUrl) {
         const html = `
-            <h2>Concernant votre offre pour ${productTitle}</h2>
-            <p>Nous avons bien étudié votre proposition, mais nous ne pouvons malheureusement pas l'accepter pour le moment.</p>
-            <p>N'hésitez pas à visiter notre boutique pour d'autres articles.</p>
+            <h2>Regarding your offer for ${productTitle}</h2>
+            <p>We have reviewed your proposal, but unfortunately we cannot accept it at this time.</p>
+            <p>Feel free to <a href="${productUrl}">visit our shop</a> to make a different offer.</p>
         `;
-        return this.sendEmail(credentials, { to, subject: "Mise à jour sur votre offre", html });
+        return this.sendEmail(credentials, { to, subject: "Update on your offer", html });
     },
 
-    async sendCounterOffer(credentials, to, newPrice, productTitle) {
+    async sendCounterOffer(credentials, to, newPrice, productTitle, code, endsAt, checkoutUrl, productUrl) {
         const html = `
-            <h2>Nouvelle proposition pour ${productTitle}</h2>
-            <p>Votre offre initiale était un peu basse, mais nous voulons trouver un terrain d'entente.</p>
-            <p>Nous pouvons vous proposer ce produit au prix exceptionnel de :</p>
+            <h2>New proposal for ${productTitle}</h2>
+            <p>Your initial offer was a bit low, but we want to find a deal.</p>
+            <p>We can offer you this product for the exceptional price of:</p>
             <h1 style="color: blue;">${newPrice} €</h1>
-            <p>Si cela vous convient, répondez à cet email pour finaliser l'achat.</p>
+            
+            <p><strong>Accept this offer:</strong> Use code <strong style="color: green;">${code}</strong> at checkout.</p>
+            <p>(Valid until ${new Date(endsAt).toLocaleString()})</p>
+
+            ${checkoutUrl ? `
+            <div style="margin: 20px 0;">
+                <a href="${checkoutUrl}" style="background-color: #008060; color: white; padding: 15px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+                    Buy now (${newPrice} €)
+                </a>
+            </div>
+            ` : ''}
+
+            <hr style="margin: 30px 0; border: 0; border-top: 1px solid #eee;" />
+            
+            <p><strong>Not interested?</strong></p>
+            <p>If this price doesn't work for you, you can <a href="${productUrl}">return to the product page</a> to make a different offer.</p>
         `;
-        return this.sendEmail(credentials, { to, subject: "Contre-proposition pour votre offre", html });
+        return this.sendEmail(credentials, { to, subject: "Counter-offer for your request", html });
     }
 };

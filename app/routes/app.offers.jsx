@@ -15,7 +15,9 @@ import {
     Modal,
     TextField,
     Frame,
-    Toast
+    Toast,
+    Thumbnail,
+    Tabs
 } from "@shopify/polaris";
 import { useLoaderData, useFetcher } from "react-router";
 import { authenticate } from "../shopify.server";
@@ -26,26 +28,66 @@ import { useTranslation } from "react-i18next";
 import { useState, useCallback } from "react";
 
 export const loader = async ({ request }) => {
-    const { session } = await authenticate.admin(request);
+    const { session, admin } = await authenticate.admin(request);
 
     // Check if shop exists
     const shop = await db.shop.findUnique({ where: { shopUrl: session.shop } });
-    if (!shop) return { offers: [] };
+    if (!shop) return { pendingOffers: [], historyOffers: [] };
 
     // Fetch Pending Offers
-    const offers = await db.offer.findMany({
+    const pendingOffersData = await db.offer.findMany({
         where: {
             shopId: shop.id,
-            status: "PENDING", // Only show pending manual offers for now
+            status: "PENDING",
         },
         orderBy: { createdAt: "desc" },
     });
 
-    return { offers };
+    // Fetch History Offers (Alles else)
+    const historyOffersData = await db.offer.findMany({
+        where: {
+            shopId: shop.id,
+            status: { not: "PENDING" },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50 // Limit history to last 50 for performance
+    });
+
+    // Helper to fetch images
+    const attachImages = async (offers) => {
+        return Promise.all(offers.map(async (offer) => {
+            let imageUrl = null;
+            if (offer.productId) {
+                try {
+                    const response = await admin.graphql(
+                        `#graphql
+                        query getProductImage($id: ID!) {
+                            product(id: $id) {
+                                featuredImage {
+                                    url
+                                }
+                            }
+                        }`,
+                        { variables: { id: `gid://shopify/Product/${offer.productId}` } }
+                    );
+                    const data = await response.json();
+                    imageUrl = data.data?.product?.featuredImage?.url;
+                } catch (err) {
+                    // console.error("Failed to fetch image:", err);
+                }
+            }
+            return { ...offer, imageUrl };
+        }));
+    };
+
+    const pendingOffers = await attachImages(pendingOffersData);
+    const historyOffers = await attachImages(historyOffersData);
+
+    return { pendingOffers, historyOffers };
 };
 
 export const action = async ({ request }) => {
-    const { session } = await authenticate.admin(request);
+    const { session, admin } = await authenticate.admin(request);
     const formData = await request.formData();
     const offerId = formData.get("offerId");
     const intent = formData.get("intent"); // ACCEPT | REJECT | COUNTER
@@ -53,9 +95,22 @@ export const action = async ({ request }) => {
     const shop = await db.shop.findUnique({ where: { shopUrl: session.shop } });
     if (!shop) return { success: false, error: "Shop not found" };
 
+    // Fetch Shop Name for Email Sender
+    let shopName = shop.shopUrl;
+    try {
+        const response = await admin.graphql(`{ shop { name } }`);
+        const data = await response.json();
+        if (data.data?.shop?.name) {
+            shopName = data.data.shop.name;
+        }
+    } catch (err) {
+        console.error("Failed to fetch shop name:", err);
+    }
+
     const credentials = {
         user: shop.gmailUser,
-        pass: shop.gmailAppPassword
+        pass: shop.gmailAppPassword,
+        name: shopName
     };
 
     const offer = await db.offer.findUnique({ where: { id: offerId } });
@@ -70,6 +125,30 @@ export const action = async ({ request }) => {
         // Validity: Now to Now + 3 Hours
         const now = new Date();
         const endsAt = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+
+        // Fetch Product Handle for "Buy Now" Link
+        let checkoutUrl = null;
+        if (productGid && admin) {
+            try {
+                const response = await admin.graphql(
+                    `#graphql
+                    query getProductHandle($id: ID!) {
+                        product(id: $id) {
+                            handle
+                        }
+                    }`,
+                    { variables: { id: productGid } }
+                );
+                const data = await response.json();
+                const handle = data.data?.product?.handle;
+
+                if (handle) {
+                    checkoutUrl = `https://${shop.shopUrl}/discount/${code}?redirect=/products/${handle}`;
+                }
+            } catch (err) {
+                console.error("Failed to fetch product handle:", err);
+            }
+        }
 
         if (productGid && discountAmount > 0) {
             const createdCode = await ShopifyService.createDiscount(
@@ -88,14 +167,19 @@ export const action = async ({ request }) => {
                     data: {
                         status: "ACCEPTED",
                         code: code,
-                        convertedAt: new Date(), // Using convertedAt to track completion time? Or maybe just status
+                        convertedAt: new Date(),
                     }
                 });
 
                 // Send Email to customer
-                await EmailService.sendOfferAccepted(credentials, offer.customerEmail, code, endsAt, offer.productTitle || "le produit");
-
-                // console.log(`[EMAIL SENT] To: ${offer.customerEmail}, Subject: Offer Accepted!, Body: Use code ${code}. Valid until ${endsAt.toLocaleString()}`);
+                await EmailService.sendOfferAccepted(
+                    credentials,
+                    offer.customerEmail,
+                    code,
+                    endsAt,
+                    offer.productTitle || "le produit",
+                    checkoutUrl // New arg
+                );
 
                 return { success: true, message: `Offer accepted! Code ${code} sent to customer.` };
             }
@@ -108,58 +192,165 @@ export const action = async ({ request }) => {
             data: { status: "REJECTED" }
         });
 
-        // Send Email to customer
-        await EmailService.sendOfferRejected(credentials, offer.customerEmail, offer.productTitle || "le produit");
+        // Fetch Handle (for return link)
+        let productUrl = `https://${shop.shopUrl}`; // Fallback
+        const productGid = offer.productId ? `gid://shopify/Product/${offer.productId}` : null;
 
-        // console.log(`[EMAIL SENT] To: ${offer.customerEmail}, Subject: Offer Declined.`);
+        if (productGid && admin) {
+            try {
+                const response = await admin.graphql(
+                    `#graphql
+                    query getProductHandle($id: ID!) {
+                        product(id: $id) {
+                            handle
+                        }
+                    }`,
+                    { variables: { id: productGid } }
+                );
+                const data = await response.json();
+                const handle = data.data?.product?.handle;
+
+                if (handle) {
+                    productUrl = `https://${shop.shopUrl}/products/${handle}`;
+                }
+            } catch (err) {
+                console.error("Failed to fetch handle for reject:", err);
+            }
+        }
+
+        // Send Email to customer
+        await EmailService.sendOfferRejected(
+            credentials,
+            offer.customerEmail,
+            offer.productTitle || "the product",
+            productUrl // New Arg
+        );
 
         return { success: true, message: "Offer rejected." };
 
     } else if (intent === "COUNTER") {
         const counterPrice = parseFloat(formData.get("counterPrice"));
+        const discountAmount = offer.originalPrice - counterPrice;
 
-        await db.offer.update({
-            where: { id: offerId },
-            data: {
-                status: "COUNTERED",
-                counterPrice: counterPrice
+        // 1. Generate Counter Code
+        const code = `COUNTER-${Math.floor(Math.random() * 1000000)}`;
+        const productGid = offer.productId ? `gid://shopify/Product/${offer.productId}` : null;
+
+        // Validity: 3 Hours
+        const now = new Date();
+        const endsAt = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+
+        // Fetch Handle (for links)
+        let checkoutUrl = null;
+        let productUrl = `https://${shop.shopUrl}`; // Fallback
+
+        if (productGid && admin) {
+            try {
+                const response = await admin.graphql(
+                    `#graphql
+                    query getProductHandle($id: ID!) {
+                        product(id: $id) {
+                            handle
+                        }
+                    }`,
+                    { variables: { id: productGid } }
+                );
+                const data = await response.json();
+                const handle = data.data?.product?.handle;
+
+                if (handle) {
+                    productUrl = `https://${shop.shopUrl}/products/${handle}`;
+                    checkoutUrl = `https://${shop.shopUrl}/discount/${code}?redirect=/products/${handle}`;
+                }
+            } catch (err) {
+                console.error("Failed to fetch handle for counter:", err);
             }
-        });
+        }
 
-        // Send Email to customer
-        await EmailService.sendCounterOffer(credentials, offer.customerEmail, counterPrice, offer.productTitle || "le produit");
+        // 2. Create Discount for Counter Price
+        if (productGid && discountAmount > 0) {
+            const createdCode = await ShopifyService.createDiscount(
+                shop.shopUrl,
+                shop.accessToken,
+                code,
+                discountAmount,
+                productGid,
+                endsAt
+            );
 
-        // console.log(`[EMAIL SENT] To: ${offer.customerEmail}, Subject: Counter Offer: ${counterPrice}€, Body: We can do ${counterPrice}€. Reply if interested.`);
+            if (createdCode) {
+                await db.offer.update({
+                    where: { id: offerId },
+                    data: {
+                        status: "COUNTERED",
+                        counterPrice: counterPrice,
+                        code: code // Store this code so we know it exists
+                    }
+                });
 
-        return { success: true, message: `Counter offer of ${counterPrice}€ sent.` };
+                // Send Email
+                await EmailService.sendCounterOffer(
+                    credentials,
+                    offer.customerEmail,
+                    counterPrice,
+                    offer.productTitle || "the product",
+                    code,
+                    endsAt,
+                    checkoutUrl,
+                    productUrl
+                );
+
+                return { success: true, message: `Counter offer sent with code ${code}.` };
+            }
+        }
+
+        return { success: false, error: "Failed to create counter discount." };
     }
 
     return { success: false };
 };
 
+
+
 export default function OffersPage() {
     const { t } = useTranslation();
-    const { offers } = useLoaderData();
+    const { pendingOffers, historyOffers } = useLoaderData();
     const fetcher = useFetcher();
 
+    const [selectedTab, setSelectedTab] = useState(0);
     const [activeOffer, setActiveOffer] = useState(null);
     const [counterPrice, setCounterPrice] = useState("");
     const [toastActive, setToastActive] = useState(false);
     const [toastMsg, setToastMsg] = useState("");
 
+    const handleTabChange = useCallback(
+        (selectedTabIndex) => setSelectedTab(selectedTabIndex),
+        [],
+    );
+
+    const tabs = [
+        {
+            id: 'pending-offers',
+            content: "En attente",
+            accessibilityLabel: 'Offers pending review',
+            panelID: 'pending-offers-content',
+        },
+        {
+            id: 'history-offers',
+            content: "Historique",
+            accessibilityLabel: 'Past offers',
+            panelID: 'history-offers-content',
+        },
+    ];
+
     const toggleToast = useCallback(() => setToastActive((active) => !active), []);
 
-    const handleAccept = (id) => {
-        fetcher.submit({ offerId: id, intent: "ACCEPT" }, { method: "POST" });
-    };
-
-    const handleReject = (id) => {
-        fetcher.submit({ offerId: id, intent: "REJECT" }, { method: "POST" });
-    };
+    const handleAccept = (id) => fetcher.submit({ offerId: id, intent: "ACCEPT" }, { method: "POST" });
+    const handleReject = (id) => fetcher.submit({ offerId: id, intent: "REJECT" }, { method: "POST" });
 
     const handleOpenCounter = (offer) => {
         setActiveOffer(offer);
-        setCounterPrice(offer.originalPrice ? offer.originalPrice.toString() : ""); // Default to original price or empty
+        setCounterPrice(offer.originalPrice ? offer.originalPrice.toString() : "");
     };
 
     const handleCloseCounter = () => {
@@ -184,13 +375,95 @@ export default function OffersPage() {
         setToastActive(true);
     }
 
-    const emptyStateMarkup = (
-        <EmptyState
-            heading={t('offers.empty_heading')}
-            image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-        >
-            <p>{t('offers.empty_body')}</p>
-        </EmptyState>
+    const renderOfferList = (offers, isHistory = false) => (
+        <ResourceList
+            resourceName={{ singular: 'offer', plural: 'offers' }}
+            items={offers}
+            emptyState={
+                <EmptyState
+                    heading={t('offers.empty_heading')}
+                    image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                >
+                    <p>{isHistory ? "Aucune offre traitée pour le moment." : t('offers.empty_body')}</p>
+                </EmptyState>
+            }
+            renderItem={(item) => {
+                const { id, offeredPrice, originalPrice, productTitle, customerEmail, createdAt, imageUrl, status, counterPrice: itemCounterPrice } = item;
+                const date = new Date(createdAt).toLocaleDateString();
+
+                const media = (
+                    <Thumbnail
+                        source={imageUrl || ""}
+                        alt={productTitle}
+                        size="small"
+                    />
+                );
+
+                let badge = null;
+                if (status === "ACCEPTED") badge = <Badge tone="success">Acceptée</Badge>;
+                else if (status === "REJECTED") badge = <Badge tone="critical">Refusée</Badge>;
+                else if (status === "COUNTERED") badge = <Badge tone="warning">Contre-offre ({itemCounterPrice}€)</Badge>;
+                else if (status === "PENDING") badge = <Badge tone="attention">En attente</Badge>;
+
+                return (
+                    <ResourceItem
+                        id={id}
+                        accessibilityLabel={`View offer for ${productTitle}`}
+                        media={media}
+                    >
+                        <BlockStack gap="200">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                <div>
+                                    <Text variant="headingMd" as="h3">
+                                        {productTitle}
+                                    </Text>
+                                    <Text variant="bodySm" tone="subdued">
+                                        {date} • {customerEmail}
+                                    </Text>
+                                </div>
+                                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                    <div>
+                                        <Text variant="headingLg" as="span" tone="success">
+                                            {offeredPrice} €
+                                        </Text>
+                                        <Text variant="bodySm" tone="subdued" as="span" style={{ marginLeft: '8px', textDecoration: 'line-through' }}>
+                                            {originalPrice} €
+                                        </Text>
+                                    </div>
+                                    {badge}
+                                </div>
+                            </div>
+
+                            {!isHistory && (
+                                <ButtonGroup>
+                                    <Button
+                                        variant="primary"
+                                        tone="success"
+                                        onClick={() => handleAccept(id)}
+                                        loading={fetcher.state === "submitting" && fetcher.formData?.get("offerId") === id && fetcher.formData?.get("intent") === "ACCEPT"}
+                                    >
+                                        {t('offers.accept')}
+                                    </Button>
+                                    <Button
+                                        onClick={() => handleOpenCounter(item)}
+                                    >
+                                        {t('offers.counter')}
+                                    </Button>
+                                    <Button
+                                        variant="primary"
+                                        tone="critical"
+                                        onClick={() => handleReject(id)}
+                                        loading={fetcher.state === "submitting" && fetcher.formData?.get("offerId") === id && fetcher.formData?.get("intent") === "REJECT"}
+                                    >
+                                        {t('offers.reject')}
+                                    </Button>
+                                </ButtonGroup>
+                            )}
+                        </BlockStack>
+                    </ResourceItem>
+                );
+            }}
+        />
     );
 
     const toastMarkup = toastActive ? (
@@ -203,67 +476,10 @@ export default function OffersPage() {
                 <Layout>
                     <Layout.Section>
                         <Card padding="0">
-                            <ResourceList
-                                resourceName={{ singular: 'offer', plural: 'offers' }}
-                                items={offers}
-                                emptyState={emptyStateMarkup}
-                                renderItem={(item) => {
-                                    const { id, offeredPrice, originalPrice, productTitle, customerEmail, createdAt } = item;
-                                    const date = new Date(createdAt).toLocaleDateString();
-
-                                    return (
-                                        <ResourceItem
-                                            id={id}
-                                            accessibilityLabel={`View offer for ${productTitle}`}
-                                        >
-                                            <BlockStack gap="200">
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                                                    <div>
-                                                        <Text variant="headingMd" as="h3">
-                                                            {productTitle}
-                                                        </Text>
-                                                        <Text variant="bodySm" tone="subdued">
-                                                            {date} • {customerEmail}
-                                                        </Text>
-                                                    </div>
-                                                    <div style={{ textAlign: 'right' }}>
-                                                        <Text variant="headingLg" as="span" tone="success">
-                                                            {offeredPrice} €
-                                                        </Text>
-                                                        <Text variant="bodySm" tone="subdued" as="span" style={{ marginLeft: '8px', textDecoration: 'line-through' }}>
-                                                            {originalPrice} €
-                                                        </Text>
-                                                    </div>
-                                                </div>
-
-                                                <ButtonGroup>
-                                                    <Button
-                                                        variant="primary"
-                                                        tone="success"
-                                                        onClick={() => handleAccept(id)}
-                                                        loading={fetcher.state === "submitting" && fetcher.formData?.get("offerId") === id && fetcher.formData?.get("intent") === "ACCEPT"}
-                                                    >
-                                                        {t('offers.accept')}
-                                                    </Button>
-                                                    <Button
-                                                        onClick={() => handleOpenCounter(item)}
-                                                    >
-                                                        {t('offers.counter')}
-                                                    </Button>
-                                                    <Button
-                                                        variant="primary"
-                                                        tone="critical"
-                                                        onClick={() => handleReject(id)}
-                                                        loading={fetcher.state === "submitting" && fetcher.formData?.get("offerId") === id && fetcher.formData?.get("intent") === "REJECT"}
-                                                    >
-                                                        {t('offers.reject')}
-                                                    </Button>
-                                                </ButtonGroup>
-                                            </BlockStack>
-                                        </ResourceItem>
-                                    );
-                                }}
-                            />
+                            <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange}>
+                                {selectedTab === 0 && renderOfferList(pendingOffers, false)}
+                                {selectedTab === 1 && renderOfferList(historyOffers, true)}
+                            </Tabs>
                         </Card>
                     </Layout.Section>
                 </Layout>
