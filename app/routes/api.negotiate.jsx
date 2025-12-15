@@ -351,12 +351,16 @@ export async function action({ request }) {
             const code = `OFFER-${Math.floor(Math.random() * 1000000)}`;
             console.log("Negotiate API: Attempting to create discount", { code, discountAmount, productGid });
 
+            const durationMinutes = shop.autoValidityDuration || 24;
+            const endsAt = new Date(Date.now() + durationMinutes * 60 * 1000);
+
             const createdCode = await ShopifyService.createDiscount(
                 shop.shopUrl,
                 shop.accessToken,
                 code,
                 discountAmount,
-                productGid
+                productGid,
+                endsAt
             );
 
             if (!createdCode) {
@@ -378,7 +382,7 @@ export async function action({ request }) {
             });
 
             const successMsg = NegotiationService.getMessage('SUCCESS', offerValue.toFixed(2), t);
-            return { status: "ACCEPTED", code, message: successMsg };
+            return { status: "ACCEPTED", code, message: successMsg, validityDuration: durationMinutes };
 
         } else {
             // REJECT / COUNTER Logic

@@ -110,7 +110,16 @@ export const action = async ({ request }) => {
     const credentials = {
         user: shop.gmailUser,
         pass: shop.gmailAppPassword,
+        smtpHost: shop.smtpHost,
+        smtpPort: shop.smtpPort,
         name: shopName
+    };
+
+    const customization = {
+        font: shop.emailFont,
+        primaryColor: shop.emailPrimaryColor,
+        subject: shop.emailAcceptedSubject, // Will be overridden for other types if passed but good to have access
+        body: shop.emailAcceptedBody // Same
     };
 
     const offer = await db.offer.findUnique({ where: { id: offerId } });
@@ -122,9 +131,10 @@ export const action = async ({ request }) => {
         const productGid = offer.productId ? `gid://shopify/Product/${offer.productId}` : null;
         const discountAmount = offer.originalPrice - offer.offeredPrice;
 
-        // Validity: Now to Now + 3 Hours
+        // Validity: Manual Duration (Minutes)
+        const durationMinutes = shop.manualValidityDuration || 72 * 60; // Default to 72h (converted to mins) if old default
         const now = new Date();
-        const endsAt = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+        const endsAt = new Date(now.getTime() + durationMinutes * 60 * 1000);
 
         // Fetch Product Handle for "Buy Now" Link
         let checkoutUrl = null;
@@ -178,7 +188,12 @@ export const action = async ({ request }) => {
                     code,
                     endsAt,
                     offer.productTitle || "le produit",
-                    checkoutUrl // New arg
+                    checkoutUrl, // New arg
+                    {
+                        ...customization,
+                        subject: shop.emailAcceptedSubject,
+                        body: shop.emailAcceptedBody
+                    }
                 );
 
                 return { success: true, message: `Offer accepted! Code ${code} sent to customer.` };
@@ -223,7 +238,12 @@ export const action = async ({ request }) => {
             credentials,
             offer.customerEmail,
             offer.productTitle || "the product",
-            productUrl // New Arg
+            productUrl, // New Arg
+            {
+                ...customization,
+                subject: shop.emailRejectedSubject,
+                body: shop.emailRejectedBody
+            }
         );
 
         return { success: true, message: "Offer rejected." };
@@ -236,9 +256,10 @@ export const action = async ({ request }) => {
         const code = `COUNTER-${Math.floor(Math.random() * 1000000)}`;
         const productGid = offer.productId ? `gid://shopify/Product/${offer.productId}` : null;
 
-        // Validity: 3 Hours
+        // Validity: Manual Duration (Minutes)
+        const durationMinutes = shop.manualValidityDuration || 72 * 60;
         const now = new Date();
-        const endsAt = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+        const endsAt = new Date(now.getTime() + durationMinutes * 60 * 1000);
 
         // Fetch Handle (for links)
         let checkoutUrl = null;
@@ -297,7 +318,12 @@ export const action = async ({ request }) => {
                     code,
                     endsAt,
                     checkoutUrl,
-                    productUrl
+                    productUrl,
+                    {
+                        ...customization,
+                        subject: shop.emailCounterSubject,
+                        body: shop.emailCounterBody
+                    }
                 );
 
                 return { success: true, message: `Counter offer sent with code ${code}.` };

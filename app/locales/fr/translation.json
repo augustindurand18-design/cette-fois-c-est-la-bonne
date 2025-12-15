@@ -40,7 +40,10 @@
         "exit_intent_label": "Activer le déclencheur de sortie (Exit Intent)",
         "exit_intent_help": "Ouvre le chat automatiquement lorsque la souris du client quitte la fenêtre.",
         "help_rounds": "Nombre maximum de contre-propositions que le bot peut faire.",
-        "help_sales": "Si décoché, le bot refusera de négocier si le produit a déjà un prix comparateur."
+        "help_sales": "Si décoché, le bot refusera de négocier si le produit a déjà un prix comparateur.",
+        "validity_title": "Durée de validité des offres",
+        "auto_validity": "Validité Auto (Chatbot)",
+        "manual_validity": "Validité Manuelle (Email)"
     },
     "customization": {
         "title": "Personnalisation",

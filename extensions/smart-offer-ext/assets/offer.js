@@ -1,26 +1,44 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const modal = document.getElementById("smart-offer-modal");
-    const btn = document.getElementById("smart-offer-trigger");
-    const closeBtn = document.querySelector(".smart-offer-close");
-    const submitBtn = document.getElementById("smart-offer-submit");
-    const input = document.getElementById("smart-offer-input");
-    const messagesContainer = document.getElementById("smart-offer-messages");
-
-    if (!btn) return;
-
-    // Default Config
-    let appSettings = {
-        botWelcomeMsg: "Hello! 👋 I can offer you a discount if you propose a reasonable price. What is your price?",
-        widgetColor: "#000000"
+    // --- State Management ---
+    const State = {
+        messages: [],
+        isThinking: false,
+        isLoading: false,
+        isOpen: false,
+        sessionId: null,
+        config: {},
+        attemptCount: 0,
+        pendingManualPrice: null
     };
 
-    // Helper: Delay function
-    const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    // --- DOM Elements ---
+    const UI = {
+        modal: document.getElementById("smart-offer-modal"),
+        btn: document.getElementById("smart-offer-trigger"),
+        closeBtn: document.querySelector(".smart-offer-close"),
+        submitBtn: document.getElementById("smart-offer-submit"),
+        input: document.getElementById("smart-offer-input"),
+        messagesContainer: document.getElementById("smart-offer-messages"),
+        chatContainer: document.querySelector('.smart-offer-chat-container')
+    };
 
-    // Fetch Custom Config
-    (async () => {
+    if (!UI.btn) return;
+
+    // Default App Settings
+    let appSettings = {
+        botWelcomeMsg: "Hello! 👋 I can offer you a discount if you propose a reasonable price. What is your price?",
+        widgetColor: "#000000",
+        botIcon: null
+    };
+
+    // --- Core Functions ---
+
+    // 1. Initialize & Fetch Config
+    const init = async () => {
         try {
             const config = window.smartOfferConfig;
+            State.config = config;
+
             const queryParams = new URLSearchParams({
                 shop: config.shopUrl,
                 productId: config.productId,
@@ -30,6 +48,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const res = await fetch(`/apps/negotiate?${queryParams.toString()}`);
             if (res.ok) {
                 const data = await res.json();
+
+                // Update Settings
                 if (data.botWelcomeMsg) appSettings.botWelcomeMsg = data.botWelcomeMsg;
                 if (data.widgetColor) appSettings.widgetColor = data.widgetColor;
                 if (data.botIcon) appSettings.botIcon = data.botIcon;
@@ -37,541 +57,399 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Apply Styles
                 const header = document.querySelector(".smart-offer-header");
                 if (header) header.style.backgroundColor = appSettings.widgetColor;
+                if (UI.submitBtn && data.widgetColor) UI.submitBtn.style.backgroundColor = data.widgetColor;
 
-                if (submitBtn && data.widgetColor) {
-                    submitBtn.style.backgroundColor = data.widgetColor;
-                }
-
+                // Activation Logic
                 if (data.isEligible && data.isActive) {
-                    btn.style.display = "flex";
+                    UI.btn.style.display = "flex";
 
-                    // Exit Intent Trigger
-                    if (data.enableExitIntent) {
-                        const onMouseLeave = (e) => {
-                            if (e.clientY <= 0) { // Mouse leaves top of viewport
-                                if (modal.style.display !== "block") {
-                                    btn.click(); // Simulate click to open
-                                }
-                                document.removeEventListener("mouseleave", onMouseLeave);
-                            }
-                        };
-                        document.addEventListener("mouseleave", onMouseLeave);
-                    }
+                    // Exit Intent
+                    if (data.enableExitIntent) setupExitIntent();
                 }
             }
         } catch (e) {
-            console.warn("SmartOffer: Could not load config", e);
+            console.warn("SmartOffer: Init failed", e);
         }
-    })();
-
-    // Chat State
-    let isThinking = false;
-    let attemptCount = 0;
-    let pendingManualPrice = null; // Store price when waiting for email
-
-    const scrollToBottom = () => {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     };
 
-    const addMessage = (text, sender, isHtml = false) => {
-        // Container (Flex row)
-        const msgDiv = document.createElement("div");
-        msgDiv.classList.add("smart-offer-message-container", sender);
-
-        // Icon (Bot only)
-        if (sender === "bot" && appSettings.botIcon) {
-            const iconImg = document.createElement("img");
-            iconImg.src = appSettings.botIcon;
-            iconImg.classList.add("smart-offer-bot-icon");
-            msgDiv.appendChild(iconImg);
-        }
-
-        // Bubble (The actual text part)
-        const bubble = document.createElement("div");
-        bubble.classList.add("smart-offer-message-bubble", sender);
-
-        if (isHtml) bubble.innerHTML = text;
-        else bubble.innerText = text;
-
-        msgDiv.appendChild(bubble);
-
-        messagesContainer.appendChild(msgDiv);
-        scrollToBottom();
-    };
-
-    const addLoading = () => {
-        const loaderContainer = document.createElement("div");
-        loaderContainer.className = "smart-offer-message-container bot";
-        loaderContainer.id = "smart-offer-loading-indicator";
-
-        if (appSettings.botIcon) {
-            const iconImg = document.createElement("img");
-            iconImg.src = appSettings.botIcon;
-            iconImg.classList.add("smart-offer-bot-icon");
-            loaderContainer.appendChild(iconImg);
-        }
-
-        const bubble = document.createElement("div");
-        // Using special class for typing indicator styling
-        bubble.className = "smart-offer-typing";
-        bubble.innerHTML = "<span></span><span></span><span></span>";
-
-        loaderContainer.appendChild(bubble);
-        messagesContainer.appendChild(loaderContainer);
-        scrollToBottom();
-    };
-
-    const removeLoading = () => {
-        const loader = document.getElementById("smart-offer-loading-indicator");
-        if (loader) loader.remove();
-    };
-
-    // Open/Close
-    btn.onclick = async function () {
-        modal.style.display = "block";
-        if (messagesContainer.children.length === 0) {
-            // Add Product Preview
-            const config = window.smartOfferConfig;
-            if (config.productImage && config.productTitle) {
-                const card = document.createElement("div");
-                card.className = "smart-offer-product-card";
-                card.style.display = "flex";
-                card.style.alignItems = "center";
-                card.style.padding = "10px";
-                card.style.marginBottom = "16px";
-                card.style.background = "#fff";
-                card.style.borderRadius = "12px";
-                card.style.border = "1px solid #f2f2f7";
-                card.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
-
-                const img = document.createElement("img");
-                img.src = config.productImage;
-                img.style.width = "48px";
-                img.style.height = "48px";
-                img.style.objectFit = "cover";
-                img.style.borderRadius = "8px";
-                img.style.marginRight = "12px";
-
-                const info = document.createElement("div");
-                info.style.display = "flex";
-                info.style.flexDirection = "column";
-
-                const title = document.createElement("span");
-                title.innerText = config.productTitle;
-                title.style.fontWeight = "600";
-                title.style.fontSize = "0.95em";
-                title.style.color = "#1c1c1e";
-
-                const price = document.createElement("span");
-                price.innerText = config.productPrice;
-                price.style.fontSize = "0.9em";
-                price.style.color = "#8e8e93";
-
-                info.appendChild(title);
-                info.appendChild(price);
-                card.appendChild(img);
-                card.appendChild(info);
-
-                const cardContainer = document.createElement("div");
-                cardContainer.style.width = "100%";
-                cardContainer.style.display = "flex";
-                cardContainer.style.justifyContent = "center";
-                cardContainer.appendChild(card);
-
-                messagesContainer.appendChild(cardContainer);
+    const setupExitIntent = () => {
+        const onMouseLeave = (e) => {
+            if (e.clientY <= 0 && !State.isOpen) {
+                openChat();
+                document.removeEventListener("mouseleave", onMouseLeave);
             }
+        };
+        document.addEventListener("mouseleave", onMouseLeave);
+    };
 
-            // Simulate typing for welcome message
-            addLoading();
-            await wait(600);
-            removeLoading();
-            addMessage(appSettings.botWelcomeMsg, "bot");
-        }
-    }
+    // 2. Chat Logic (Optimistic UI)
+    const handleSendMessage = async () => {
+        const text = UI.input.value.trim();
+        if (!text || State.isThinking) return;
 
-    closeBtn.onclick = function () {
-        modal.style.display = "none";
-    }
+        // A. Optimistic Update (Immediate)
+        addMessage(text, 'user');
+        UI.input.value = "";
+        State.attemptCount++;
+        setThinking(true);
 
-    window.onclick = function (event) {
-        if (event.target == modal) {
-            modal.style.display = "none";
-        }
-    }
+        // B. Prepare Payload
+        if (!State.sessionId) State.sessionId = generateUUID();
 
-    // Submit Action
-    const handleSubmit = async () => {
-        if (isThinking) return;
-
-        const inputValue = input.value;
-        if (!inputValue) return;
-
-        attemptCount++; // Increment attempt
-
-        // User Message
-        addMessage(inputValue, "user");
-        input.value = "";
-
-        isThinking = true;
-        submitBtn.disabled = true;
-
-        // Random "thinking" delay for realism (1s to 2s)
-        const thinkingTime = 1000 + Math.random() * 1000;
-        addLoading();
-
-        // Generate or retrieve Session ID for Rate Limiting
-        let sessionId = sessionStorage.getItem("smartOfferSessionId");
-        if (!sessionId) {
-            sessionId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-            sessionStorage.setItem("smartOfferSessionId", sessionId);
-        }
-
-        // Determine payload based on state
-        let payload = {
-            productId: window.smartOfferConfig.productId,
-            shopUrl: window.smartOfferConfig.shopUrl,
-            round: attemptCount,
-            sessionId: sessionId
+        const payload = {
+            productId: State.config.productId,
+            shopUrl: State.config.shopUrl,
+            round: State.attemptCount,
+            sessionId: State.sessionId,
+            offerPrice: State.pendingManualPrice ? State.pendingManualPrice : text,
+            customerEmail: State.pendingManualPrice ? text : undefined // If pending manual, text is email
         };
 
-        if (pendingManualPrice) {
-            payload.offerPrice = pendingManualPrice;
-            payload.customerEmail = inputValue;
-        } else {
-            payload.offerPrice = inputValue;
-            // No email yet
-        }
-
+        // C. Network Request
         try {
-            const [response] = await Promise.all([
-                fetch('/apps/negotiate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                }),
-                wait(thinkingTime) // Ensure we wait at least this long
-            ]);
+            // Artificial delay for realism (min 800ms) to prevent flickering "too fast" responses
+            const startTime = Date.now();
+
+            const response = await fetch('/apps/negotiate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
             const data = await response.json();
-            removeLoading();
+
+            // Ensure minimum delay
+            const elapsed = Date.now() - startTime;
+            if (elapsed < 800) await wait(800 - elapsed);
+
+            setThinking(false);
 
             if (response.ok) {
-                if (data.status === 'ACCEPTED') {
-                    // Trigger Confetti
-                    launchConfetti();
-
-                    addMessage(data.message || `It's a deal for <b>${payload.offerPrice}€</b> ! 🎉`, "bot", true);
-
-                    // Refined Action Button
-                    const actionBtn = document.createElement("button");
-                    actionBtn.className = "smart-offer-action-btn";
-                    actionBtn.innerText = "Add to Cart & Pay";
-
-                    // Logic to add to cart and redirect
-                    actionBtn.onclick = async () => {
-                        actionBtn.innerText = "Adding...";
-                        actionBtn.disabled = true;
-                        actionBtn.style.opacity = "0.8";
-
-                        const root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || "/";
-
-                        try {
-                            // 1. Add to Cart via AJAX
-                            const addToCartRes = await fetch(root + 'cart/add.js', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    items: [{
-                                        id: window.smartOfferConfig.variantId,
-                                        quantity: 1,
-                                        properties: {
-                                            '_SmartOffer': 'Accepted' // Mark as negotiated item if needed later
-                                        }
-                                    }]
-                                })
-                            });
-
-                            if (addToCartRes.ok) {
-                                actionBtn.innerText = "Redirecting to checkout...";
-                                // 2. Redirect to Checkout with Discount Code
-                                window.location.href = `/discount/${data.code}?redirect=/checkout`;
-                            } else {
-                                throw new Error("Cart add failed");
-                            }
-                        } catch (e) {
-                            console.error(e);
-                            actionBtn.innerText = "Error - Retry";
-                            actionBtn.disabled = false;
-                            actionBtn.style.opacity = "1";
-                        }
-                    };
-
-                    // Add button as a specialized message bubble
-                    const btnContainer = document.createElement("div");
-                    btnContainer.classList.add("smart-offer-message-container", "bot");
-
-                    if (appSettings.botIcon) {
-                        const iconImg = document.createElement("img");
-                        iconImg.src = appSettings.botIcon;
-                        iconImg.classList.add("smart-offer-bot-icon");
-                        btnContainer.appendChild(iconImg);
-                    }
-
-                    const bubble = document.createElement("div");
-                    bubble.classList.add("smart-offer-message-bubble", "bot");
-                    bubble.style.background = "transparent";
-                    bubble.style.padding = "0";
-                    bubble.style.boxShadow = "none";
-                    bubble.appendChild(actionBtn);
-
-                    btnContainer.appendChild(bubble);
-                    messagesContainer.appendChild(btnContainer);
-                    scrollToBottom();
-
-                    // Countdown logic
-                    let timeLeft = 300; // 5 minutes to create urgency
-                    const originalBtnText = "Add to Cart & Pay";
-
-                    const updateTimer = () => {
-                        const minutes = Math.floor(timeLeft / 60);
-                        const seconds = timeLeft % 60;
-                        const timeString = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-                        if (!actionBtn.disabled || actionBtn.innerText.includes("Add")) {
-                            actionBtn.innerText = `${originalBtnText} (${timeString})`;
-                        }
-                    };
-                    updateTimer();
-
-                    const timerInterval = setInterval(() => {
-                        timeLeft--;
-                        if (timeLeft <= 0) {
-                            clearInterval(timerInterval);
-                            actionBtn.innerText = "Offer expired";
-                            actionBtn.disabled = true;
-                            actionBtn.onclick = null;
-                        } else {
-                            updateTimer();
-                        }
-                    }, 1000);
-
-
-                    // Disable further input
-                    input.disabled = true;
-                    submitBtn.style.display = 'none';
-
-                } else if (data.status === 'REQUEST_EMAIL') {
-                    // Manual Mode: Bot asks for email
-                    pendingManualPrice = payload.offerPrice;
-                    addMessage(data.message, "bot");
-
-                    input.placeholder = "name@example.com";
-                    input.type = "email";
-                    input.focus();
-
-                } else if (data.status === 'MANUAL_COMPLETED') {
-                    // Manual Mode: Finished
-                    addMessage(data.message, "bot");
-
-                    // Reset or Close
-                    pendingManualPrice = null;
-                    input.disabled = true;
-                    submitBtn.style.display = 'none';
-
-                } else if (data.status === 'REJECTED' || data.status === 'COUNTER') {
-                    // Trigger Shake
-                    const container = document.querySelector('.smart-offer-chat-container');
-                    if (container) {
-                        container.classList.remove('smart-offer-shake');
-                        void container.offsetWidth; // trigger reflow
-                        container.classList.add('smart-offer-shake');
-                        setTimeout(() => container.classList.remove('smart-offer-shake'), 500);
-                    }
-
-                    addMessage(data.message || `Hmm, that's too low. I can go down to ${data.counterPrice}€, no less.`, "bot");
-
-                    if (data.counterPrice) {
-                        const acceptBtn = document.createElement("button");
-                        acceptBtn.className = "smart-offer-action-btn";
-                        acceptBtn.innerText = `Accept counter-offer (${data.counterPrice} €)`;
-                        acceptBtn.style.marginTop = "8px";
-
-                        acceptBtn.onclick = () => {
-                            input.value = data.counterPrice;
-                            handleSubmit();
-                            acceptBtn.remove();
-                        };
-
-                        const btnContainer = document.createElement("div");
-                        btnContainer.classList.add("smart-offer-message-container", "bot");
-                        if (appSettings.botIcon) {
-                            const iconImg = document.createElement("img");
-                            iconImg.src = appSettings.botIcon;
-                            iconImg.classList.add("smart-offer-bot-icon");
-                            btnContainer.appendChild(iconImg);
-                        }
-
-                        const bubble = document.createElement("div");
-                        bubble.classList.add("smart-offer-message-bubble", "bot");
-                        bubble.style.background = "transparent";
-                        bubble.style.padding = "0";
-                        bubble.style.boxShadow = "none";
-                        bubble.appendChild(acceptBtn);
-
-                        btnContainer.appendChild(bubble);
-                        messagesContainer.appendChild(btnContainer);
-                        scrollToBottom();
-                    }
-
-                } else if (data.status === 'CHAT') {
-                    addMessage(data.message, "bot");
-                } else if (data.status === 'ERROR') {
-                    addMessage(data.error || "An error occurred.", "bot");
-                } else {
-                    addMessage("An error occurred.", "bot");
-                }
-
+                handleServerResponse(data, payload);
             } else {
-                addMessage("Connection error.", "bot");
+                addMessage("Connection error. Please try again.", "bot");
             }
 
         } catch (e) {
             console.error(e);
-            removeLoading();
-            addMessage("Failed to send message.", "bot");
-        } finally {
-            if (!input.disabled) {
-                isThinking = false;
-                submitBtn.disabled = false;
-                input.focus();
-            }
+            setThinking(false);
+            addMessage("Network error. Check your connection.", "bot");
         }
     };
 
-    submitBtn.onclick = handleSubmit;
+    const handleServerResponse = (data, payload) => {
+        switch (data.status) {
+            case 'ACCEPTED':
+                launchConfetti();
+                addMessage(data.message || `Deal! ${payload.offerPrice}€ accepted.`, "bot", true);
+                showActionBtn("Add to Cart & Pay", data);
+                lockInput();
+                break;
 
-    input.addEventListener("keypress", function (event) {
-        if (event.key === "Enter") {
-            event.preventDefault();
-            handleSubmit();
+            case 'REQUEST_EMAIL':
+                State.pendingManualPrice = payload.offerPrice;
+                addMessage(data.message, "bot");
+                UI.input.placeholder = "Enter your email...";
+                UI.input.type = "email";
+                UI.input.focus();
+                break;
+
+            case 'MANUAL_COMPLETED':
+                addMessage(data.message, "bot");
+                lockInput();
+                State.pendingManualPrice = null;
+                break;
+
+            case 'REJECTED':
+            case 'COUNTER':
+                triggerShake();
+                addMessage(data.message || "Offer rejected.", "bot");
+                if (data.counterPrice) {
+                    showActionBtn(`Accept ${data.counterPrice} €`, data, 'accept_counter');
+                }
+                break;
+
+            case 'CHAT':
+            default:
+                addMessage(data.message || "I didn't understand.", "bot");
+                break;
         }
-    });
+    };
 
-    // Mobile Keyboard Handling: Visual Viewport Binding
-    if (window.visualViewport) {
-        const handleVisualViewportResize = () => {
-            // Only apply fix on mobile screens
-            if (window.innerWidth <= 480) {
-                const container = document.querySelector('.smart-offer-chat-container');
-                if (container) {
-                    // Force height to match the actual visible area
-                    container.style.height = `${window.visualViewport.height}px`;
+    // 3. UI Helpers
+    const addMessage = (text, sender, isHtml = false) => {
+        const msgDiv = document.createElement("div");
+        msgDiv.className = `smart-offer-message-container ${sender}`;
 
-                    // CRITICAL: Sync top position to viewport offset to handle scroll
-                    // This ensures the fixed container moves with the visual viewport
-                    container.style.top = `${window.visualViewport.offsetTop}px`;
+        if (sender === 'bot' && appSettings.botIcon) {
+            const icon = document.createElement("img");
+            icon.src = appSettings.botIcon;
+            icon.className = "smart-offer-bot-icon";
+            msgDiv.appendChild(icon);
+        }
 
-                    // Detect keyboard: if viewport height is significantly less than window innerHeight
-                    if (window.visualViewport.height < window.innerHeight * 0.85) {
-                        container.classList.add('keyboard-open');
-                    } else {
-                        container.classList.remove('keyboard-open');
-                    }
+        const bubble = document.createElement("div");
+        bubble.className = `smart-offer-message-bubble ${sender}`;
+        if (isHtml) bubble.innerHTML = text;
+        else bubble.innerText = text;
 
-                    setTimeout(scrollToBottom, 50);
+        msgDiv.appendChild(bubble);
+        UI.messagesContainer.appendChild(msgDiv);
+        scrollToBottom();
+    };
+
+    const setThinking = (isThinking) => {
+        State.isThinking = isThinking;
+        UI.submitBtn.disabled = isThinking;
+        UI.input.disabled = isThinking; // Optional: prevent spam
+
+        if (isThinking) {
+            // Add Loading Indicator
+            const loader = document.createElement("div");
+            loader.id = "smart-offer-loader";
+            loader.className = "smart-offer-message-container bot";
+
+            if (appSettings.botIcon) {
+                const icon = document.createElement("img");
+                icon.src = appSettings.botIcon;
+                icon.className = "smart-offer-bot-icon";
+                loader.appendChild(icon);
+            }
+
+            const bubble = document.createElement("div");
+            bubble.className = "smart-offer-typing";
+            bubble.innerHTML = "<span></span><span></span><span></span>";
+            loader.appendChild(bubble);
+
+            UI.messagesContainer.appendChild(loader);
+        } else {
+            // Remove Loading Indicator
+            const loader = document.getElementById("smart-offer-loader");
+            if (loader) loader.remove();
+            UI.input.disabled = false;
+            UI.input.focus();
+        }
+        scrollToBottom();
+    };
+
+    const scrollToBottom = () => {
+        // Force scroll with robust fallback for mobile browsers
+        requestAnimationFrame(() => {
+            UI.messagesContainer.scrollTop = UI.messagesContainer.scrollHeight;
+        });
+    };
+
+    const showActionBtn = (text, data, type = 'main') => {
+        const container = document.createElement("div");
+        container.className = "smart-offer-message-container bot";
+
+        // Ghost bubble for alignment
+        const bubble = document.createElement("div");
+        bubble.className = "smart-offer-message-bubble bot";
+        bubble.style.background = "transparent";
+        bubble.style.boxShadow = "none";
+        bubble.style.padding = "0";
+
+        const btn = document.createElement("button");
+        btn.className = "smart-offer-action-btn";
+        btn.innerText = text;
+
+        if (type === 'accept_counter') {
+            btn.style.marginTop = "8px";
+            btn.onclick = () => {
+                UI.input.value = data.counterPrice;
+                handleSendMessage(); // Re-trigger logic with counter price
+                btn.remove();
+            };
+        } else {
+            // Checkout Logic
+            setupCheckoutButton(btn, data);
+        }
+
+        bubble.appendChild(btn);
+        container.appendChild(bubble);
+        UI.messagesContainer.appendChild(container);
+        scrollToBottom();
+    };
+
+    const setupCheckoutButton = (btn, data) => {
+        const originalText = btn.innerText;
+        let timeLeft = (data.validityDuration || 5) * 60;
+
+        // Add to Cart Logic
+        btn.onclick = async () => {
+            btn.innerText = "Processing...";
+            btn.disabled = true;
+            btn.style.opacity = "0.7";
+
+            try {
+                const root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || "/";
+                const res = await fetch(root + 'cart/add.js', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: [{ id: State.config.variantId, quantity: 1, properties: { '_SmartOffer': 'Accepted' } }]
+                    })
+                });
+
+                if (res.ok) {
+                    btn.innerText = "Redirecting...";
+                    window.location.href = `${root}discount/${data.code}?redirect=${root}checkout`;
+                } else {
+                    throw new Error("Cart failed");
                 }
-            } else {
-                // Reset on desktop/larger screens
-                const container = document.querySelector('.smart-offer-chat-container');
-                if (container) {
-                    container.style.height = '';
-                    container.style.top = ''; // Reset top
-                    container.classList.remove('keyboard-open');
-                }
+            } catch (e) {
+                console.error(e);
+                btn.innerText = "Error. Retry?";
+                btn.disabled = false;
+                btn.style.opacity = "1";
             }
         };
 
-        window.visualViewport.addEventListener('resize', handleVisualViewportResize);
-        window.visualViewport.addEventListener('scroll', handleVisualViewportResize);
+        // Timer
+        const interval = setInterval(() => {
+            timeLeft--;
+            if (timeLeft <= 0) {
+                clearInterval(interval);
+                btn.innerText = "Offer Expired";
+                btn.disabled = true;
+            } else {
+                const m = Math.floor(timeLeft / 60);
+                const s = timeLeft % 60;
+                if (!btn.disabled) btn.innerText = `${originalText} (${m}:${s < 10 ? '0' : ''}${s})`;
+            }
+        }, 1000);
+    };
 
-        // Initial check
-        handleVisualViewportResize();
-    }
+    const lockInput = () => {
+        UI.input.disabled = true;
+        UI.submitBtn.style.display = 'none';
+    };
 
-    input.addEventListener('focus', () => {
-        // slight delay to ensure keyboard animation is factored in if viewport doesn't fire immediately
-        setTimeout(scrollToBottom, 300);
+    const triggerShake = () => {
+        UI.chatContainer.classList.remove('smart-offer-shake');
+        void UI.chatContainer.offsetWidth; // Force reflow
+        UI.chatContainer.classList.add('smart-offer-shake');
+    };
+
+    // 4. Modal Management
+    const openChat = async () => {
+        UI.modal.style.display = "block";
+        State.isOpen = true;
+        document.body.style.overflow = "hidden"; // Mobile Scroll Lock
+
+        // Add Product Card & Welcome if empty
+        if (UI.messagesContainer.children.length === 0) {
+            renderProductCard();
+            setThinking(true);
+            await wait(600);
+            setThinking(false);
+            addMessage(appSettings.botWelcomeMsg, "bot");
+        }
+
+        handleVisualViewport();
+    };
+
+    const closeChat = () => {
+        UI.modal.style.display = "none";
+        State.isOpen = false;
+        document.body.style.overflow = "";
+    };
+
+    const renderProductCard = () => {
+        const { productImage, productTitle, productPrice } = State.config;
+        if (!productImage) return;
+
+        const card = document.createElement("div");
+        card.innerHTML = `
+            <div class="smart-offer-product-card" style="display:flex; align-items:center; padding:10px; margin-bottom:16px; background:#fff; border-radius:12px; border:1px solid #f2f2f7; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                <img src="${productImage}" style="width:48px; height:48px; object-fit:cover; border-radius:8px; margin-right:12px;" />
+                <div style="display:flex; flex-direction:column;">
+                    <span style="font-weight:600; font-size:0.95em; color:#1c1c1e;">${productTitle}</span>
+                    <span style="font-size:0.9em; color:#8e8e93;">${productPrice}</span>
+                </div>
+            </div>
+        `;
+        // Centering wrapper
+        const wrapper = document.createElement("div");
+        wrapper.style.display = "flex"; wrapper.style.justifyContent = "center"; wrapper.style.width = "100%";
+        wrapper.appendChild(card.firstElementChild);
+        UI.messagesContainer.appendChild(wrapper);
+    };
+
+    // 5. Mobile & Viewport Handling
+    const handleVisualViewport = () => {
+        if (!window.visualViewport || window.innerWidth > 480) return;
+
+        const onResize = () => {
+            if (!State.isOpen) return;
+            const vv = window.visualViewport;
+            const style = UI.chatContainer.style;
+
+            // Sync with viewport
+            style.height = `${vv.height}px`;
+            style.top = `${vv.offsetTop}px`;
+
+            // Adjust padding for keyboard
+            if (vv.height < window.innerHeight * 0.85) {
+                UI.chatContainer.classList.add('keyboard-open');
+            } else {
+                UI.chatContainer.classList.remove('keyboard-open');
+            }
+            scrollToBottom();
+        };
+
+        window.visualViewport.addEventListener('resize', onResize);
+        window.visualViewport.addEventListener('scroll', onResize);
+        onResize(); // Initial call
+    };
+
+    // --- Event Listeners ---
+    UI.btn.onclick = openChat;
+    UI.closeBtn.onclick = closeChat;
+    window.addEventListener('click', (e) => { if (e.target === UI.modal) closeChat(); });
+
+    UI.submitBtn.onclick = handleSendMessage;
+    UI.input.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            handleSendMessage();
+        }
     });
 
-    // --- Simple Confetti Implementation ---
+    // Mobile Focus Hack to scroll
+    UI.input.addEventListener('focus', () => setTimeout(scrollToBottom, 300));
+
+    // Utils
+    const wait = (ms) => new Promise(r => setTimeout(r, ms));
+    const generateUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+
+    // Confetti (Minified for brevity, same logic)
     function launchConfetti() {
-        // Target the container
-        const container = document.querySelector('.smart-offer-chat-container');
-        if (!container) return;
-
-        // Create canvas
-        const canvas = document.createElement('canvas');
-        canvas.style.position = 'absolute'; // Absolute relative to container
-        canvas.style.top = '0';
-        canvas.style.left = '0';
-        canvas.style.width = '100%';
-        canvas.style.height = '100%';
-        canvas.style.pointerEvents = 'none';
-        canvas.style.zIndex = '10'; // Inside container, on top of messages
-        canvas.style.borderRadius = '20px'; // Match container radius
-        container.appendChild(canvas);
-
-        const ctx = canvas.getContext('2d');
-        const width = container.offsetWidth;
-        const height = container.offsetHeight;
-        canvas.width = width;
-        canvas.height = height;
-
-        const particles = [];
-        const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#00ffff', '#ff00ff', '#ffa500'];
-
-        for (let i = 0; i < 150; i++) {
-            particles.push({
-                x: width / 2, // Start from center width
-                y: height * 0.8, // Start from lower part (near input)
-                vx: (Math.random() - 0.5) * 15, // Explosion spread
-                vy: (Math.random() * -12) - 5, // Upward force
-                color: colors[Math.floor(Math.random() * colors.length)],
-                size: Math.random() * 5 + 3,
-                gravity: 0.4,
-                drag: 0.95
-            });
-        }
-
-        function render() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const c = document.querySelector('.smart-offer-chat-container'); if (!c) return;
+        const cvs = document.createElement('canvas');
+        cvs.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;border-radius:20px;";
+        c.appendChild(cvs);
+        const ctx = cvs.getContext('2d');
+        cvs.width = c.offsetWidth; cvs.height = c.offsetHeight;
+        const particles = Array.from({ length: 100 }, () => ({
+            x: cvs.width / 2, y: cvs.height * 0.8, vx: (Math.random() - 0.5) * 15, vy: (Math.random() * -12) - 5,
+            color: `hsl(${Math.random() * 360}, 100%, 50%)`, size: Math.random() * 5 + 2
+        }));
+        function loop() {
+            ctx.clearRect(0, 0, cvs.width, cvs.height);
             let active = false;
-
             particles.forEach(p => {
-                p.x += p.vx;
-                p.y += p.vy;
-                p.vy += p.gravity;
-                p.vx *= p.drag;
-                p.vy *= p.drag;
-
-                if (p.y < canvas.height + 20 && p.size > 0.1) {
-                    active = true;
-                    ctx.fillStyle = p.color;
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                    ctx.fill();
-                }
+                p.x += p.vx; p.y += p.vy; p.vy += 0.4; p.vx *= 0.95; p.vy *= 0.95;
+                if (p.y < cvs.height + 20) { active = true; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); }
             });
-
-            if (active) {
-                requestAnimationFrame(render);
-            } else {
-                canvas.remove();
-            }
+            if (active) requestAnimationFrame(loop); else cvs.remove();
         }
-        render();
+        loop();
     }
 
+    // Start
+    init();
 });

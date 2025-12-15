@@ -6,6 +6,7 @@ import {
     Card,
     Text,
     BlockStack,
+    FormLayout,
     Select,
     Checkbox,
     Box,
@@ -46,7 +47,9 @@ export const loader = async ({ request }) => {
         strategy: shop.strategy,
         allowSaleItems: shop.allowSaleItems,
         enableExitIntent: shop.enableExitIntent,
-        autoNegotiation: shop.autoNegotiation !== false
+        autoNegotiation: shop.autoNegotiation !== false,
+        autoValidityDuration: shop.autoValidityDuration || 24,
+        manualValidityDuration: shop.manualValidityDuration || 72,
     };
 };
 
@@ -63,6 +66,8 @@ export const action = async ({ request }) => {
         const strategy = formData.get("strategy");
         const allowSaleItems = formData.get("allowSaleItems") === "true";
         const enableExitIntent = formData.get("enableExitIntent") === "true";
+        const autoValidityDuration = parseInt(formData.get("autoValidityDuration"), 10);
+        const manualValidityDuration = parseInt(formData.get("manualValidityDuration"), 10);
 
         console.log("Saving Rules:", {
             priceRounding,
@@ -83,7 +88,9 @@ export const action = async ({ request }) => {
                 strategy,
                 allowSaleItems,
                 enableExitIntent,
-                autoNegotiation: formData.get("autoNegotiation") === "true"
+                autoNegotiation: formData.get("autoNegotiation") === "true",
+                autoValidityDuration: !isNaN(autoValidityDuration) ? autoValidityDuration : 24,
+                manualValidityDuration: !isNaN(manualValidityDuration) ? manualValidityDuration : 72
             },
         });
 
@@ -105,6 +112,8 @@ export default function RulesPage() {
     const [allowSaleItems, setAllowSaleItems] = useState(loaderData.allowSaleItems);
     const [enableExitIntent, setEnableExitIntent] = useState(loaderData.enableExitIntent);
     const [autoNegotiation, setAutoNegotiation] = useState(loaderData.autoNegotiation);
+    const [autoValidity, setAutoValidity] = useState(loaderData.autoValidityDuration.toString());
+    const [manualValidity, setManualValidity] = useState(loaderData.manualValidityDuration.toString());
 
     const [isDirty, setIsDirty] = useState(false);
 
@@ -118,7 +127,9 @@ export default function RulesPage() {
             strategy !== loaderData.strategy ||
             allowSaleItems !== loaderData.allowSaleItems ||
             enableExitIntent !== loaderData.enableExitIntent ||
-            autoNegotiation !== loaderData.autoNegotiation;
+            autoNegotiation !== loaderData.autoNegotiation ||
+            autoValidity !== loaderData.autoValidityDuration.toString() ||
+            manualValidity !== loaderData.manualValidityDuration.toString();
 
         setIsDirty(isModified);
     }, [rounding, isActive, maxRounds, strategy, allowSaleItems, enableExitIntent, autoNegotiation, loaderData]);
@@ -132,7 +143,9 @@ export default function RulesPage() {
             strategy: strategy,
             allowSaleItems: allowSaleItems.toString(),
             enableExitIntent: enableExitIntent.toString(),
-            autoNegotiation: autoNegotiation.toString()
+            autoNegotiation: autoNegotiation.toString(),
+            autoValidityDuration: autoValidity,
+            manualValidityDuration: manualValidity
         }, { method: "POST" });
     };
 
@@ -191,6 +204,49 @@ export default function RulesPage() {
                                     </InlineStack>
                                 </Box>
                             </BlockStack>
+
+                            <Box borderBlockStartWidth="025" borderColor="border-subdued" paddingBlockStart="400">
+                                <Text as="h3" variant="headingSm">{t('rules.validity_title') || "Durée de validité des offres"}</Text>
+                                <Box paddingBlockStart="200">
+                                    <FormLayout>
+                                        <FormLayout.Group>
+                                            <Select
+                                                label={t('rules.auto_validity') || "Validité Auto (Chatbot)"}
+                                                options={[
+                                                    { label: '1 minute', value: '1' },
+                                                    { label: '2 minutes', value: '2' },
+                                                    { label: '3 minutes', value: '3' },
+                                                    { label: '4 minutes', value: '4' },
+                                                    { label: '5 minutes', value: '5' },
+                                                    { label: '6 minutes', value: '6' },
+                                                    { label: '7 minutes', value: '7' },
+                                                    { label: '8 minutes', value: '8' },
+                                                    { label: '9 minutes', value: '9' },
+                                                    { label: '10 minutes', value: '10' },
+                                                ]}
+                                                onChange={setAutoValidity}
+                                                value={autoValidity}
+                                                helpText="Expiration des codes générés par chatbot."
+                                            />
+                                            <Select
+                                                label={t('rules.manual_validity') || "Validité Manuelle (Email)"}
+                                                options={[
+                                                    { label: '5 minutes', value: '5' },
+                                                    { label: '15 minutes', value: '15' },
+                                                    { label: '30 minutes', value: '30' },
+                                                    { label: '45 minutes', value: '45' },
+                                                    { label: '1 heure', value: '60' },
+                                                    { label: '2 heures', value: '120' },
+                                                    { label: '24 heures (1 jour)', value: '1440' },
+                                                ]}
+                                                onChange={setManualValidity}
+                                                value={manualValidity}
+                                                helpText="Expiration des codes envoyés manuellement."
+                                            />
+                                        </FormLayout.Group>
+                                    </FormLayout>
+                                </Box>
+                            </Box>
                         </BlockStack>
                     </Card>
 
@@ -258,6 +314,8 @@ export default function RulesPage() {
                             />
                         </BlockStack>
                     </Card>
+
+
                 </Layout.Section>
             </Layout>
         </Page>

@@ -22,12 +22,16 @@ export const loader = async ({ request }) => {
         return {
             gmailUser: "",
             hasPassword: false,
+            smtpHost: "",
+            smtpPort: 587,
         };
     }
 
     return {
         gmailUser: shop.gmailUser,
         hasPassword: !!shop.gmailAppPassword,
+        smtpHost: shop.smtpHost,
+        smtpPort: shop.smtpPort || 587,
     };
 };
 
@@ -39,9 +43,13 @@ export const action = async ({ request }) => {
     if (actionType === "saveParameters") {
         const gmailUser = formData.get("gmailUser");
         const gmailAppPassword = formData.get("gmailAppPassword");
+        const smtpHost = formData.get("smtpHost");
+        const smtpPort = formData.get("smtpPort");
 
         const updateData = {
             gmailUser,
+            smtpHost,
+            smtpPort: smtpPort ? parseInt(smtpPort) : 587,
         };
 
         if (gmailAppPassword && gmailAppPassword !== "********") {
@@ -66,22 +74,28 @@ export default function ParametersPage() {
 
     const [gmailUser, setGmailUser] = useState(loaderData.gmailUser || "");
     const [gmailAppPassword, setGmailAppPassword] = useState(loaderData.hasPassword ? "********" : "");
+    const [smtpHost, setSmtpHost] = useState(loaderData.smtpHost || "");
+    const [smtpPort, setSmtpPort] = useState(loaderData.smtpPort || 587);
 
     const [isDirty, setIsDirty] = useState(false);
 
     useEffect(() => {
         const isModified =
             gmailUser !== (loaderData.gmailUser || "") ||
-            (gmailAppPassword !== "********" && gmailAppPassword !== "");
+            (gmailAppPassword !== "********" && gmailAppPassword !== "") ||
+            smtpHost !== (loaderData.smtpHost || "") ||
+            smtpPort !== (loaderData.smtpPort || 587);
 
         setIsDirty(isModified);
-    }, [gmailUser, gmailAppPassword, loaderData]);
+    }, [gmailUser, gmailAppPassword, smtpHost, smtpPort, loaderData]);
 
 
     const handleSave = () => {
         let formData = new FormData();
         formData.append("actionType", "saveParameters");
         formData.append("gmailUser", gmailUser);
+        formData.append("smtpHost", smtpHost);
+        formData.append("smtpPort", smtpPort);
         if (gmailAppPassword !== "********") {
             formData.append("gmailAppPassword", gmailAppPassword);
         }
@@ -120,6 +134,23 @@ export default function ParametersPage() {
                                         autoComplete="new-password"
                                         helpText={t('parameters.gmail_password_help')}
                                     />
+                                    <FormLayout.Group>
+                                        <TextField
+                                            label="SMTP Host (Optional)"
+                                            value={smtpHost}
+                                            onChange={setSmtpHost}
+                                            placeholder="smtp.office365.com"
+                                            helpText="Leave empty to use default Gmail service."
+                                            autoComplete="off"
+                                        />
+                                        <TextField
+                                            label="SMTP Port"
+                                            value={smtpPort}
+                                            onChange={setSmtpPort}
+                                            type="number"
+                                            autoComplete="off"
+                                        />
+                                    </FormLayout.Group>
                                 </FormLayout>
                             </Box>
                         </BlockStack>

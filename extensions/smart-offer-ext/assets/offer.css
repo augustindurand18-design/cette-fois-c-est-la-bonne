@@ -70,18 +70,23 @@
 /* Mobile Responsive */
 @media (max-width: 480px) {
   .smart-offer-chat-container {
-    position: fixed;
     /* Enforce fixed to support viewport sync */
     width: 100%;
-    height: 100dvh;
     /* Use dvh for dynamic viewport handling */
+    height: 100dvh;
     max-width: 100%;
     max-height: 100dvh;
-    border-radius: 0;
-    top: 0;
+    border-radius: 24px 24px 0 0;
+    /* Smoother curve */
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.1);
+    /* Deeper shadow */
+
+    top: auto;
+    bottom: 0px;
     left: 0;
     transform: none;
-    animation: slideUpMobile 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: slideUpMobile 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+    /* iOS Spring-ish */
   }
 
   @keyframes slideUpMobile {
@@ -95,9 +100,12 @@
   }
 
   .smart-offer-input-area {
-    /* Increase padding to ensure input doesn't tech bottom edge/keyboard */
-    padding-bottom: max(35px, env(safe-area-inset-bottom));
-    transition: padding-bottom 0.2s;
+    /* Increase padding to ensure input doesn't touch bottom edge/keyboard */
+    /* Add safe-area-inset-bottom for iPhone X+ */
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    transition: padding-bottom 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
   /* When keyboard is open (detected by JS), remove the extra padding to sit flush */
@@ -128,8 +136,11 @@
   font-size: 28px;
   font-weight: 400;
   cursor: pointer;
-  line-height: 0.8;
+  line-height: 1;
   transition: color 0.2s;
+  /* Larger touch target */
+  padding: 8px;
+  margin: -8px;
 }
 
 .smart-offer-close:hover {
@@ -274,18 +285,21 @@
   flex: 1;
   padding: 12px 16px;
   border: 1px solid #e5e5ea;
-  border-radius: 24px;
+  border-radius: 20px;
   outline: none;
   font-size: 16px;
   /* 16px prevents iOS zoom on focus */
-  background-color: #f9f9f9;
+  background-color: #F2F2F7;
+  /* Apple gray */
   transition: all 0.2s;
+  -webkit-appearance: none;
+  /* Remove iOS styles */
 }
 
 #smart-offer-input:focus {
   border-color: #007aff;
   background-color: #fff;
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.15);
 }
 
 #smart-offer-submit {
@@ -399,4 +413,16 @@
   .smart-offer-shake {
     animation: smartOfferShakeMobile 0.4s cubic-bezier(.36, .07, .19, .97) both;
   }
+}
+
+.smart-offer-branding {
+  font-size: 11px;
+  color: #c7c7cc;
+  text-align: center;
+  padding: 8px;
+  background-color: #f9f9f9;
+  border-top: 1px solid #f2f2f7;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  user-select: none;
 }
