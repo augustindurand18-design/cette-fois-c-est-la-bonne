@@ -30,6 +30,7 @@ export default function App() {
           <a href="/app/offers">{t('nav.offers')}</a>
           <a href="/app/customization">{t('nav.customization')}</a>
           <a href="/app/parameters">{t('nav.parameters')}</a>
+          <a href="/app/pricing">Pricing</a>
         </ui-nav-menu>
         <Outlet />
       </PolarisAppProvider>

@@ -267,6 +267,12 @@ export default function Index() {
         onAction: () => fetcher.load("/api/export-offers"),
         disabled: fetcher.state === "loading"
       }}
+      secondaryActions={[
+        {
+          content: "Pricing Plans",
+          url: "/app/pricing",
+        }
+      ]}
     >
       <Layout>
         {/* Filter Section */}
