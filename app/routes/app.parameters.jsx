@@ -136,15 +136,15 @@ export default function ParametersPage() {
                                     />
                                     <FormLayout.Group>
                                         <TextField
-                                            label="SMTP Host (Optional)"
+                                            label={t('parameters.smtp_host')}
                                             value={smtpHost}
                                             onChange={setSmtpHost}
                                             placeholder="smtp.office365.com"
-                                            helpText="Leave empty to use default Gmail service."
+                                            helpText={t('parameters.smtp_host_help')}
                                             autoComplete="off"
                                         />
                                         <TextField
-                                            label="SMTP Port"
+                                            label={t('parameters.smtp_port')}
                                             value={smtpPort}
                                             onChange={setSmtpPort}
                                             type="number"

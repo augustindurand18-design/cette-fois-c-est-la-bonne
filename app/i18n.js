@@ -8,6 +8,7 @@ i18n
     .use(LanguageDetector)
     .use(initReactI18next)
     .init({
+        lng: "en", // Force English as requested
         fallbackLng: "en",
         supportedLngs: ["en", "fr"],
         resources: {
@@ -21,7 +22,8 @@ i18n
             useSuspense: false,
         },
         detection: {
-            order: ["shopify", "navigator", "htmlTag"],
+            // Priority to forced language, but keeping detection config for future flexibility
+            order: ["localStorage", "navigator"],
             caches: ["localStorage"],
         },
     });

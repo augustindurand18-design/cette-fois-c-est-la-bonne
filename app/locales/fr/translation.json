@@ -4,6 +4,14 @@
         "saving": "Enregistrement...",
         "success": "Succès"
     },
+    "time": {
+        "minutes_one": "1 minute",
+        "minutes_other": "{{count}} minutes",
+        "hours_one": "1 heure",
+        "hours_other": "{{count}} heures",
+        "days_one": "1 jour",
+        "days_other": "{{count}} jours"
+    },
     "dashboard": {
         "title": "Tableau de Bord",
         "total_offers": "Total Offres",
@@ -43,7 +51,10 @@
         "help_sales": "Si décoché, le bot refusera de négocier si le produit a déjà un prix comparateur.",
         "validity_title": "Durée de validité des offres",
         "auto_validity": "Validité Auto (Chatbot)",
-        "manual_validity": "Validité Manuelle (Email)"
+        "manual_validity": "Validité Manuelle (Email)",
+        "auto_validity_help": "Expiration des codes générés par chatbot.",
+        "manual_validity_help": "Expiration des codes envoyés manuellement.",
+        "strategy_default": "Défaut : Modéré"
     },
     "customization": {
         "title": "Personnalisation",
@@ -143,7 +154,10 @@
         "gmail_user": "Adresse Gmail",
         "gmail_user_help": "L'adresse email qui enverra les réponses.",
         "gmail_password": "Mot de passe d'application",
-        "gmail_password_help": "Générez un mot de passe d'application dans votre compte Google > Sécurité."
+        "gmail_password_help": "Générez un mot de passe d'application dans votre compte Google > Sécurité.",
+        "smtp_host": "Hôte SMTP (Optionnel)",
+        "smtp_host_help": "Laisser vide pour utiliser le service Gmail par défaut.",
+        "smtp_port": "Port SMTP"
     },
     "nav": {
         "dashboard": "Tableau de Bord",

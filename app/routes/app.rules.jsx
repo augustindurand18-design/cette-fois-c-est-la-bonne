@@ -206,42 +206,42 @@ export default function RulesPage() {
                             </BlockStack>
 
                             <Box borderBlockStartWidth="025" borderColor="border-subdued" paddingBlockStart="400">
-                                <Text as="h3" variant="headingSm">{t('rules.validity_title') || "Durée de validité des offres"}</Text>
+                                <Text as="h3" variant="headingSm">{t('rules.validity_title')}</Text>
                                 <Box paddingBlockStart="200">
                                     <FormLayout>
                                         <FormLayout.Group>
                                             <Select
-                                                label={t('rules.auto_validity') || "Validité Auto (Chatbot)"}
+                                                label={t('rules.auto_validity')}
                                                 options={[
-                                                    { label: '1 minute', value: '1' },
-                                                    { label: '2 minutes', value: '2' },
-                                                    { label: '3 minutes', value: '3' },
-                                                    { label: '4 minutes', value: '4' },
-                                                    { label: '5 minutes', value: '5' },
-                                                    { label: '6 minutes', value: '6' },
-                                                    { label: '7 minutes', value: '7' },
-                                                    { label: '8 minutes', value: '8' },
-                                                    { label: '9 minutes', value: '9' },
-                                                    { label: '10 minutes', value: '10' },
+                                                    { label: t('time.minutes', { count: 1 }), value: '1' },
+                                                    { label: t('time.minutes', { count: 2 }), value: '2' },
+                                                    { label: t('time.minutes', { count: 3 }), value: '3' },
+                                                    { label: t('time.minutes', { count: 4 }), value: '4' },
+                                                    { label: t('time.minutes', { count: 5 }), value: '5' },
+                                                    { label: t('time.minutes', { count: 6 }), value: '6' },
+                                                    { label: t('time.minutes', { count: 7 }), value: '7' },
+                                                    { label: t('time.minutes', { count: 8 }), value: '8' },
+                                                    { label: t('time.minutes', { count: 9 }), value: '9' },
+                                                    { label: t('time.minutes', { count: 10 }), value: '10' },
                                                 ]}
                                                 onChange={setAutoValidity}
                                                 value={autoValidity}
-                                                helpText="Expiration des codes générés par chatbot."
+                                                helpText={t('rules.auto_validity_help')}
                                             />
                                             <Select
-                                                label={t('rules.manual_validity') || "Validité Manuelle (Email)"}
+                                                label={t('rules.manual_validity')}
                                                 options={[
-                                                    { label: '5 minutes', value: '5' },
-                                                    { label: '15 minutes', value: '15' },
-                                                    { label: '30 minutes', value: '30' },
-                                                    { label: '45 minutes', value: '45' },
-                                                    { label: '1 heure', value: '60' },
-                                                    { label: '2 heures', value: '120' },
-                                                    { label: '24 heures (1 jour)', value: '1440' },
+                                                    { label: t('time.minutes', { count: 5 }), value: '5' },
+                                                    { label: t('time.minutes', { count: 15 }), value: '15' },
+                                                    { label: t('time.minutes', { count: 30 }), value: '30' },
+                                                    { label: t('time.minutes', { count: 45 }), value: '45' },
+                                                    { label: t('time.hours', { count: 1 }), value: '60' },
+                                                    { label: t('time.hours', { count: 2 }), value: '120' },
+                                                    { label: t('time.days', { count: 1 }), value: '1440' },
                                                 ]}
                                                 onChange={setManualValidity}
                                                 value={manualValidity}
-                                                helpText="Expiration des codes envoyés manuellement."
+                                                helpText={t('rules.manual_validity_help')}
                                             />
                                         </FormLayout.Group>
                                     </FormLayout>
@@ -277,7 +277,7 @@ export default function RulesPage() {
                                 ]}
                                 onChange={(val) => setStrategy(val)}
                                 value={strategy}
-                                helpText="Défaut: Modéré"
+                                helpText={t('rules.strategy_default') || "Default: Moderate"}
                             />
 
                             <Checkbox
