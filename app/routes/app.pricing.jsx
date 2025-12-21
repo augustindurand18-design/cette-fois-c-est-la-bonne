@@ -120,8 +120,8 @@ export default function Pricing() {
                             features={[
                                 "Full Features Access",
                                 "4% Commission on Sales",
-                                "Risk-Free Start",
-                                "Basic Support"
+                                "Unlimited Volume",
+                                "Priority Support"
                             ]}
                             isCurrent={currentPlan === "Starter"}
                             targetPlan="Starter"
@@ -133,7 +133,7 @@ export default function Pricing() {
                             features={[
                                 "Full Features Access",
                                 "1% Commission on Sales",
-                                "Reduced Fees",
+                                "Unlimited Volume",
                                 "Priority Support"
                             ]}
                             isCurrent={currentPlan === "Growth"}
@@ -147,7 +147,7 @@ export default function Pricing() {
                                 "Full Features Access",
                                 "0% Commission",
                                 "Unlimited Volume",
-                                "Dedicated Success Manager"
+                                "Priority Support"
                             ]}
                             isCurrent={currentPlan === "Scale"}
                             targetPlan="Scale"
