@@ -68,6 +68,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     // Inactivity Trigger
                     if (data.enableInactivityTrigger) setupInactivityTrigger();
+                } else {
+                    // Explicitly ensure it's hidden and remove listeners if any
+                    UI.btn.style.display = "none";
                 }
             }
         } catch (e) {

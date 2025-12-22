@@ -112,38 +112,39 @@ export default function RulesPage() {
     const fetcher = useFetcher();
     const { t } = useTranslation();
 
-    const [rounding, setRounding] = useState(loaderData.priceRounding ? loaderData.priceRounding.toString() : "0.85");
+    const [rounding, setRounding] = useState(loaderData.priceRounding !== undefined ? loaderData.priceRounding.toString() : "0.85");
     const [isActive, setIsActive] = useState(loaderData.isActive);
-    const [maxRounds, setMaxRounds] = useState(loaderData.maxRounds.toString());
-    const [strategy, setStrategy] = useState(loaderData.strategy);
+    const [maxRounds, setMaxRounds] = useState(loaderData.maxRounds ? loaderData.maxRounds.toString() : "3");
+    const [strategy, setStrategy] = useState(loaderData.strategy || "moderate");
     const [allowSaleItems, setAllowSaleItems] = useState(loaderData.allowSaleItems);
     const [enableExitIntent, setEnableExitIntent] = useState(loaderData.enableExitIntent);
     const [enableInactivityTrigger, setEnableInactivityTrigger] = useState(loaderData.enableInactivityTrigger);
-    const [fulfillmentMode, setFulfillmentMode] = useState(loaderData.fulfillmentMode);
+    const [fulfillmentMode, setFulfillmentMode] = useState(loaderData.fulfillmentMode || "DISCOUNT_CODE");
     const [autoNegotiation, setAutoNegotiation] = useState(loaderData.autoNegotiation);
-    const [autoValidity, setAutoValidity] = useState(loaderData.autoValidityDuration.toString());
-    const [manualValidity, setManualValidity] = useState(loaderData.manualValidityDuration.toString());
+    const [autoValidity, setAutoValidity] = useState(loaderData.autoValidityDuration ? loaderData.autoValidityDuration.toString() : "24");
+    const [manualValidity, setManualValidity] = useState(loaderData.manualValidityDuration ? loaderData.manualValidityDuration.toString() : "72");
 
     const [isDirty, setIsDirty] = useState(false);
 
-
-
     useEffect(() => {
+        // Safe comparison strings
+        const s = (val) => (val === null || val === undefined) ? "" : val.toString();
+
         const isModified =
-            rounding !== (loaderData.priceRounding ? loaderData.priceRounding.toString() : "0.85") ||
-            isActive !== loaderData.isActive ||
-            maxRounds !== loaderData.maxRounds.toString() ||
-            strategy !== loaderData.strategy ||
-            allowSaleItems !== loaderData.allowSaleItems ||
-            enableExitIntent !== loaderData.enableExitIntent ||
-            enableInactivityTrigger !== loaderData.enableInactivityTrigger ||
-            fulfillmentMode !== loaderData.fulfillmentMode ||
-            autoNegotiation !== loaderData.autoNegotiation ||
-            autoValidity !== loaderData.autoValidityDuration.toString() ||
-            manualValidity !== loaderData.manualValidityDuration.toString();
+            s(rounding) !== s(loaderData.priceRounding !== undefined ? loaderData.priceRounding : 0.85) ||
+            s(isActive) !== s(loaderData.isActive) ||
+            s(maxRounds) !== s(loaderData.maxRounds) ||
+            s(strategy) !== s(loaderData.strategy) ||
+            s(allowSaleItems) !== s(loaderData.allowSaleItems) ||
+            s(enableExitIntent) !== s(loaderData.enableExitIntent) ||
+            s(enableInactivityTrigger) !== s(loaderData.enableInactivityTrigger) ||
+            s(fulfillmentMode) !== s(loaderData.fulfillmentMode || "DISCOUNT_CODE") ||
+            s(autoNegotiation) !== s(loaderData.autoNegotiation) ||
+            s(autoValidity) !== s(loaderData.autoValidityDuration || 24) ||
+            s(manualValidity) !== s(loaderData.manualValidityDuration || 72);
 
         setIsDirty(isModified);
-    }, [rounding, isActive, maxRounds, strategy, allowSaleItems, enableExitIntent, enableInactivityTrigger, fulfillmentMode, autoNegotiation, loaderData]);
+    }, [rounding, isActive, maxRounds, strategy, allowSaleItems, enableExitIntent, enableInactivityTrigger, fulfillmentMode, autoNegotiation, autoValidity, manualValidity, loaderData]);
 
     const handleSave = () => {
         fetcher.submit({
