@@ -62,6 +62,7 @@
         "section_title": "Configuration du Chatbot",
         "auto_negotiation": "Négociation Automatique (Bot)",
         "auto_negotiation_help": "Si désactivé, le bot demandera l'email du client et vous devrez répondre manuellement.",
+        "widget_appearance": "Apparence du Widget",
         "widget_color": "Couleur du Widget",
         "click_to_change": "Cliquer pour changer la couleur",
         "click": "Cliquer",

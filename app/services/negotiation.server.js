@@ -50,25 +50,59 @@ export const NegotiationService = {
      * @param {string} sessionId 
      * @param {string} shopId 
      */
-    async checkRateLimit(sessionId, shopId) {
+    /**
+     * Check if a session has exceeded the rate limit
+     * @param {string} sessionId 
+     * @param {string} shopId 
+     * @param {string} productId (Optional) specific product checking
+     */
+    async checkRateLimit(sessionId, shopId, productId = null) {
         if (!sessionId) return;
 
+        // 1. Anti-Spam: Max 10 attempts per minute globally
         const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_SECONDS * 1000);
-
         const recentOffers = await db.offer.count({
             where: {
                 sessionId: sessionId,
                 shopId: shopId,
-                createdAt: {
-                    gte: windowStart
-                }
+                createdAt: { gte: windowStart }
             }
         });
 
         if (recentOffers >= MAX_OFFERS_PER_WINDOW) {
-            // This error message should also be translated, but errors are often hardcoded for now.
-            // Let's keep it simple or throw a specific error code.
             throw new Error("Trop de tentatives. Veuillez patienter une minute.");
+        }
+
+        // 2. Anti-Hoarding: Max 5 ACCEPTED offers per 24h globally for this session
+        const dayStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const dailyAccepted = await db.offer.count({
+            where: {
+                sessionId: sessionId,
+                shopId: shopId,
+                status: "ACCEPTED",
+                createdAt: { gte: dayStart }
+            }
+        });
+
+        if (dailyAccepted >= 5) {
+            throw new Error("Limite quotidienne atteinte. Vous avez déjà négocié le maximum d'articles pour aujourd'hui.");
+        }
+
+        // 3. Anti-Brute-Force: Max 20 attempts per product per hour
+        if (productId) {
+            const hourStart = new Date(Date.now() - 60 * 60 * 1000);
+            const productAttempts = await db.offer.count({
+                where: {
+                    sessionId: sessionId,
+                    shopId: shopId,
+                    productId: productId,
+                    createdAt: { gte: hourStart }
+                }
+            });
+
+            if (productAttempts >= 20) {
+                throw new Error("Trop de tentatives sur ce produit. Revenez plus tard.");
+            }
         }
     },
 

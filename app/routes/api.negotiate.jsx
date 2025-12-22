@@ -176,9 +176,9 @@ export async function action({ request }) {
             return fallbackValue || key;
         };
 
-        // 2. Rate Limit Check
+        // 2. Rate Limit & Anti-Abuse Check
         if (sessionId) {
-            await NegotiationService.checkRateLimit(sessionId, shop.id);
+            await NegotiationService.checkRateLimit(sessionId, shop.id, productId);
         }
 
         // 3. Fetch Product Data

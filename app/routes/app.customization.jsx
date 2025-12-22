@@ -557,7 +557,7 @@ export default function CustomizationPage() {
                                     <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginBottom: "2rem" }}>
                                         {/* Left Column: Settings */}
                                         <div style={{ flex: "1 1 400px" }}>
-                                            <Text as="h2" variant="headingMd">Widget Appearance</Text>
+                                            <Text as="h2" variant="headingMd">{t('customization.widget_appearance')}</Text>
                                             <FormLayout>
                                                 <Box paddingBlockEnd="400">
                                                     <Text variant="headingSm" as="h6">{t('customization.widget_color')}</Text>

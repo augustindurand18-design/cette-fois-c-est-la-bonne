@@ -94,7 +94,13 @@ document.addEventListener('DOMContentLoaded', function () {
         setThinking(true);
 
         // B. Prepare Payload
-        if (!State.sessionId) State.sessionId = generateUUID();
+        // 1. Try to get Session ID from LocalStorage
+        let storedSessionId = localStorage.getItem("smartOfferSessionId");
+        if (!storedSessionId) {
+            storedSessionId = generateUUID();
+            localStorage.setItem("smartOfferSessionId", storedSessionId);
+        }
+        State.sessionId = storedSessionId;
 
         const payload = {
             productId: State.config.productId,
