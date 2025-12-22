@@ -219,6 +219,8 @@
         "counter_instruction": "Start negotiation with {{email}} who offered {{price}}€.",
         "new_price": "New Price (€)",
         "send_counter": "Send Proposal",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "pending": "Pending",
+        "history": "History"
     }
 }

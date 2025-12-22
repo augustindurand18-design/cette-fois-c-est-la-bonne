@@ -105,7 +105,9 @@ export async function action({ request }) {
             return { status: "ERROR", error: "Le jeton d'accès est manquant. Veuillez réinstaller l'application." };
         }
 
-        // Initialize Translator with Shop Settings
+        // Initialize Translator with Shop Settings and Client Locale
+        const clientLocale = body.locale || 'en';
+
         let customReactions = {};
         try {
             if (shop.reactionMessages) {
@@ -124,7 +126,13 @@ export async function action({ request }) {
             }
             if (customValue) return customValue;
 
-            // 2. Fallback to English Defaults
+            // 2. Fallback to i18next translations (using client locale)
+            // We use the imported i18n instance to get the translation for the specific locale
+            if (i18n.exists(key, { lng: clientLocale })) {
+                return i18n.t(key, { lng: clientLocale, returnObjects: true });
+            }
+
+            // 3. Ultimate Fallback (Hardcoded English if i18n fails or key missing)
             const enTranslations = {
                 negotiation: {
                     reactions: {

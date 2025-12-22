@@ -17,7 +17,7 @@ import {
     Frame,
     Toast,
     Thumbnail,
-    Tabs
+    InlineStack
 } from "@shopify/polaris";
 import { useLoaderData, useFetcher } from "react-router";
 import { authenticate } from "../shopify.server";
@@ -54,34 +54,58 @@ export const loader = async ({ request }) => {
     });
 
     // Helper to fetch images
+    // Optimized helper to fetch images in ONE batch request
     const attachImages = async (offers) => {
-        return Promise.all(offers.map(async (offer) => {
-            let imageUrl = null;
-            if (offer.productId) {
-                try {
-                    const response = await admin.graphql(
-                        `#graphql
-                        query getProductImage($id: ID!) {
-                            product(id: $id) {
-                                featuredImage {
-                                    url
-                                }
+        const productIds = offers
+            .filter(o => o.productId)
+            .map(o => `gid://shopify/Product/${o.productId}`);
+
+        if (productIds.length === 0) return offers;
+
+        try {
+            const response = await admin.graphql(
+                `#graphql
+                query getProductImages($ids: [ID!]!) {
+                    nodes(ids: $ids) {
+                        ... on Product {
+                            id
+                            featuredImage {
+                                url
                             }
-                        }`,
-                        { variables: { id: `gid://shopify/Product/${offer.productId}` } }
-                    );
-                    const data = await response.json();
-                    imageUrl = data.data?.product?.featuredImage?.url;
-                } catch (err) {
-                    // console.error("Failed to fetch image:", err);
+                        }
+                    }
+                }`,
+                { variables: { ids: productIds } }
+            );
+
+            const data = await response.json();
+            const products = data.data?.nodes || [];
+
+            // Create a lookup map: numeric ID -> image URL
+            const imageMap = {};
+            products.forEach(p => {
+                if (p && p.id) {
+                    const idParts = p.id.split('/');
+                    const numericId = idParts[idParts.length - 1];
+                    imageMap[numericId] = p.featuredImage?.url;
                 }
-            }
-            return { ...offer, imageUrl };
-        }));
+            });
+
+            return offers.map(offer => ({
+                ...offer,
+                imageUrl: offer.productId ? imageMap[offer.productId] : null
+            }));
+
+        } catch (err) {
+            console.error("Failed to batch fetch images:", err);
+            return offers; // Return offers without images on failure
+        }
     };
 
-    const pendingOffers = await attachImages(pendingOffersData);
-    const historyOffers = await attachImages(historyOffersData);
+    const [pendingOffers, historyOffers] = await Promise.all([
+        attachImages(pendingOffersData),
+        attachImages(historyOffersData)
+    ]);
 
     return { pendingOffers, historyOffers };
 };
@@ -338,36 +362,26 @@ export const action = async ({ request }) => {
 
 
 
+
 export default function OffersPage() {
     const { t } = useTranslation();
     const { pendingOffers, historyOffers } = useLoaderData();
     const fetcher = useFetcher();
 
-    const [selectedTab, setSelectedTab] = useState(0);
+    const [selectedTab, setSelectedTab] = useState('pending');
     const [activeOffer, setActiveOffer] = useState(null);
     const [counterPrice, setCounterPrice] = useState("");
     const [toastActive, setToastActive] = useState(false);
     const [toastMsg, setToastMsg] = useState("");
 
     const handleTabChange = useCallback(
-        (selectedTabIndex) => setSelectedTab(selectedTabIndex),
+        (value) => setSelectedTab(value),
         [],
     );
 
-    const tabs = [
-        {
-            id: 'pending-offers',
-            content: "En attente",
-            accessibilityLabel: 'Offers pending review',
-            panelID: 'pending-offers-content',
-        },
-        {
-            id: 'history-offers',
-            content: "Historique",
-            accessibilityLabel: 'Past offers',
-            panelID: 'history-offers-content',
-        },
-    ];
+
+
+
 
     const toggleToast = useCallback(() => setToastActive((active) => !active), []);
 
@@ -401,97 +415,117 @@ export default function OffersPage() {
         setToastActive(true);
     }
 
-    const renderOfferList = (offers, isHistory = false) => (
-        <ResourceList
-            resourceName={{ singular: 'offer', plural: 'offers' }}
-            items={offers}
-            emptyState={
-                <EmptyState
-                    heading={t('offers.empty_heading')}
-                    image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-                >
-                    <p>{isHistory ? "Aucune offre traitée pour le moment." : t('offers.empty_body')}</p>
-                </EmptyState>
-            }
-            renderItem={(item) => {
-                const { id, offeredPrice, originalPrice, productTitle, customerEmail, createdAt, imageUrl, status, counterPrice: itemCounterPrice } = item;
-                const date = new Date(createdAt).toLocaleDateString();
+    // Custom lightweight row component to guarantee instant rendering without ResourceList overhead
+    const OfferRow = ({ offer, isHistory, onAccept, onReject, onCounter, activeFetcherId }) => {
+        const { t } = useTranslation();
+        const { id, offeredPrice, originalPrice, productTitle, customerEmail, createdAt, imageUrl, status, counterPrice: itemCounterPrice } = offer;
+        const date = new Date(createdAt).toLocaleDateString();
 
-                const media = (
-                    <Thumbnail
-                        source={imageUrl || ""}
-                        alt={productTitle}
-                        size="small"
-                    />
-                );
+        let badge = null;
+        if (status === "ACCEPTED") badge = <Badge tone="success">Acceptée</Badge>;
+        else if (status === "REJECTED") badge = <Badge tone="critical">Refusée</Badge>;
+        else if (status === "COUNTERED") badge = <Badge tone="warning">Contre-offre ({itemCounterPrice}€)</Badge>;
+        else if (status === "PENDING") badge = <Badge tone="attention">En attente</Badge>;
 
-                let badge = null;
-                if (status === "ACCEPTED") badge = <Badge tone="success">Acceptée</Badge>;
-                else if (status === "REJECTED") badge = <Badge tone="critical">Refusée</Badge>;
-                else if (status === "COUNTERED") badge = <Badge tone="warning">Contre-offre ({itemCounterPrice}€)</Badge>;
-                else if (status === "PENDING") badge = <Badge tone="attention">En attente</Badge>;
+        return (
+            <Box padding="400" borderBlockEndWidth="025" borderColor="border-subdued">
+                <BlockStack gap="400">
+                    <InlineStack align="space-between" blockAlign="center" gap="400" wrap={false}>
+                        {/* Left: Image + Info */}
+                        <InlineStack gap="400" wrap={false} blockAlign="center">
+                            <Thumbnail
+                                source={imageUrl || ""}
+                                alt={productTitle}
+                                size="small"
+                            />
+                            <BlockStack gap="050">
+                                <Text variant="headingMd" as="h3">
+                                    {productTitle}
+                                </Text>
+                                <Text variant="bodySm" tone="subdued">
+                                    {date} • {customerEmail}
+                                </Text>
+                            </BlockStack>
+                        </InlineStack>
 
-                return (
-                    <ResourceItem
-                        id={id}
-                        accessibilityLabel={`View offer for ${productTitle}`}
-                        media={media}
-                    >
-                        <BlockStack gap="200">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                                <div>
-                                    <Text variant="headingMd" as="h3">
-                                        {productTitle}
-                                    </Text>
-                                    <Text variant="bodySm" tone="subdued">
-                                        {date} • {customerEmail}
-                                    </Text>
-                                </div>
-                                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                                    <div>
-                                        <Text variant="headingLg" as="span" tone="success">
-                                            {offeredPrice} €
-                                        </Text>
-                                        <Text variant="bodySm" tone="subdued" as="span" style={{ marginLeft: '8px', textDecoration: 'line-through' }}>
-                                            {originalPrice} €
-                                        </Text>
-                                    </div>
-                                    {badge}
-                                </div>
+                        {/* Right: Price + Badge */}
+                        <BlockStack gap="100" align="end">
+                            <div>
+                                <Text variant="headingLg" as="span" tone="success">
+                                    {offeredPrice} €
+                                </Text>
+                                <Text variant="bodySm" tone="subdued" as="span" style={{ marginLeft: '8px', textDecoration: 'line-through' }}>
+                                    {originalPrice} €
+                                </Text>
                             </div>
-
-                            {!isHistory && (
-                                <ButtonGroup>
-                                    <Button
-                                        variant="primary"
-                                        tone="success"
-                                        onClick={() => handleAccept(id)}
-                                        loading={fetcher.state === "submitting" && fetcher.formData?.get("offerId") === id && fetcher.formData?.get("intent") === "ACCEPT"}
-                                    >
-                                        {t('offers.accept')}
-                                    </Button>
-                                    <Button
-                                        onClick={() => handleOpenCounter(item)}
-                                    >
-                                        {t('offers.counter')}
-                                    </Button>
-                                    <Button
-                                        variant="primary"
-                                        tone="critical"
-                                        onClick={() => handleReject(id)}
-                                        loading={fetcher.state === "submitting" && fetcher.formData?.get("offerId") === id && fetcher.formData?.get("intent") === "REJECT"}
-                                    >
-                                        {t('offers.reject')}
-                                    </Button>
-                                </ButtonGroup>
-                            )}
+                            {badge}
                         </BlockStack>
-                    </ResourceItem>
-                );
-            }}
-        />
-    );
+                    </InlineStack>
 
+                    {/* Actions (Only for Pending) */}
+                    {!isHistory && (
+                        <InlineStack gap="200" align="end">
+                            <Button
+                                onClick={() => onCounter(offer)}
+                            >
+                                {t('offers.counter')}
+                            </Button>
+                            <Button
+                                variant="primary"
+                                tone="critical"
+                                onClick={() => onReject(id)}
+                                loading={activeFetcherId === id + "-REJECT"}
+                            >
+                                {t('offers.reject')}
+                            </Button>
+                            <Button
+                                variant="primary"
+                                tone="success"
+                                onClick={() => onAccept(id)}
+                                loading={activeFetcherId === id + "-ACCEPT"}
+                            >
+                                {t('offers.accept')}
+                            </Button>
+                        </InlineStack>
+                    )}
+                </BlockStack>
+            </Box>
+        );
+    };
+
+    // Main List Container
+    const OffersListContainer = ({ offers, isHistory, onAccept, onReject, onCounter, fetcher }) => {
+        const { t } = useTranslation();
+
+        if (!offers || offers.length === 0) {
+            return (
+                <Box padding="800">
+                    <EmptyState
+                        heading={t('offers.empty_heading')}
+                        image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                    >
+                        <p>{isHistory ? "Aucune offre traitée pour le moment." : t('offers.empty_body')}</p>
+                    </EmptyState>
+                </Box>
+            );
+        }
+
+        return (
+            <div>
+                {offers.map(offer => (
+                    <OfferRow
+                        key={offer.id}
+                        offer={offer}
+                        isHistory={isHistory}
+                        onAccept={onAccept}
+                        onReject={onReject}
+                        onCounter={onCounter}
+                        activeFetcherId={fetcher.state === "submitting" ? fetcher.formData?.get("offerId") + "-" + fetcher.formData?.get("intent") : null}
+                    />
+                ))}
+            </div>
+        );
+    };
     const toastMarkup = toastActive ? (
         <Toast content={toastMsg} onDismiss={toggleToast} duration={4000} />
     ) : null;
@@ -502,10 +536,43 @@ export default function OffersPage() {
                 <Layout>
                     <Layout.Section>
                         <Card padding="0">
-                            <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange}>
-                                {selectedTab === 0 && renderOfferList(pendingOffers, false)}
-                                {selectedTab === 1 && renderOfferList(historyOffers, true)}
-                            </Tabs>
+                            <Box padding="300" borderBlockEndWidth="025" borderColor="border-subdued">
+                                <InlineStack gap="200">
+                                    <Button
+                                        pressed={selectedTab === 'pending'}
+                                        onClick={() => handleTabChange('pending')}
+                                    >
+                                        {t('offers.pending') || "En attente"}
+                                    </Button>
+                                    <Button
+                                        pressed={selectedTab === 'history'}
+                                        onClick={() => handleTabChange('history')}
+                                    >
+                                        {t('offers.history') || "Historique"}
+                                    </Button>
+                                </InlineStack>
+
+                            </Box>
+                            <div style={{ display: selectedTab === 'pending' ? 'block' : 'none' }}>
+                                <OffersListContainer
+                                    offers={pendingOffers}
+                                    isHistory={false}
+                                    onAccept={handleAccept}
+                                    onReject={handleReject}
+                                    onCounter={handleOpenCounter}
+                                    fetcher={fetcher}
+                                />
+                            </div>
+                            <div style={{ display: selectedTab === 'history' ? 'block' : 'none' }}>
+                                <OffersListContainer
+                                    offers={historyOffers}
+                                    isHistory={true}
+                                    onAccept={handleAccept}
+                                    onReject={handleReject}
+                                    onCounter={handleOpenCounter}
+                                    fetcher={fetcher}
+                                />
+                            </div>
                         </Card>
                     </Layout.Section>
                 </Layout>
@@ -546,6 +613,6 @@ export default function OffersPage() {
                 </Modal>
                 {toastMarkup}
             </Page>
-        </Frame>
+        </Frame >
     );
 }

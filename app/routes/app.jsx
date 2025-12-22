@@ -1,9 +1,11 @@
 import { Outlet, useLoaderData, useRouteError } from "react-router";
+import { useEffect } from "react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
-import "@shopify/polaris/build/esm/styles.css";
 import { authenticate } from "../shopify.server";
+
+export const links = () => [];
 
 export const loader = async ({ request }) => {
   await authenticate.admin(request);
@@ -16,11 +18,43 @@ import { useTranslation } from "react-i18next";
 
 export default function App() {
   const { apiKey } = useLoaderData();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  // Sync language with Shopify Admin locale (passed as query param)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const locale = params.get("locale");
+    if (locale) {
+      // Shopify sends 'fr-FR', i18next expects 'fr' or 'fr-FR' depending on setup.
+      // Our resources are 'fr' and 'en'.
+      const lang = locale.split('-')[0];
+      if (lang !== i18n.language) {
+        i18n.changeLanguage(lang);
+      }
+    }
+  }, [i18n]);
+
+  // Static Polaris translations to avoid context re-initialization
+  const polarisTranslations = {
+    Polaris: {
+      ResourceList: {
+        sortingLabel: "Sort by",
+        defaultItemSingular: "item",
+        defaultItemPlural: "items",
+        showing: "Showing {itemsCount} {resource}",
+        Item: {
+          actionsMenuLabel: "Actions used for selection",
+        },
+      },
+      Common: {
+        checkbox: "checkbox",
+      },
+    },
+  };
 
   return (
     <AppProvider embedded apiKey={apiKey}>
-      <PolarisAppProvider>
+      <PolarisAppProvider i18n={polarisTranslations}>
         <ui-nav-menu>
           <a href="/app" rel="home">
             {t('nav.dashboard')}

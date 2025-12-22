@@ -8,7 +8,7 @@ i18n
     .use(LanguageDetector)
     .use(initReactI18next)
     .init({
-        lng: "en", // Force English as requested
+        // lng: "en", // Removed to enable detection
         fallbackLng: "en",
         supportedLngs: ["en", "fr"],
         resources: {

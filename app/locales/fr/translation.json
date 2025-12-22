@@ -179,6 +179,8 @@
         "counter_instruction": "Le client a proposé {{price}}€. Proposez un autre montant à {{email}}.",
         "new_price": "Nouveau Prix (€)",
         "send_counter": "Envoyer la proposition",
-        "cancel": "Annuler"
+        "cancel": "Annuler",
+        "pending": "En attente",
+        "history": "Historique"
     }
 }

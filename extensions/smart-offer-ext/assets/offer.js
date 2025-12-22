@@ -108,7 +108,8 @@ document.addEventListener('DOMContentLoaded', function () {
             round: State.attemptCount,
             sessionId: State.sessionId,
             offerPrice: State.pendingManualPrice ? State.pendingManualPrice : text,
-            customerEmail: State.pendingManualPrice ? text : undefined // If pending manual, text is email
+            customerEmail: State.pendingManualPrice ? text : undefined, // If pending manual, text is email
+            locale: (document.documentElement.lang || 'en').split('-')[0] // Send 'fr' or 'en'
         };
 
         // C. Network Request
