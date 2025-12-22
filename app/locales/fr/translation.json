@@ -127,6 +127,11 @@
             "invalid_offer": "Je n'ai pas compris votre prix. Pouvez-vous me donner un montant (ex: 45) ?",
             "sale_restriction": "Désolé, je ne peux pas négocier sur les articles déjà soldés.",
             "min_limit_reached": "Désolé, je ne peux pas descendre plus bas que {{price}} €. C'est mon dernier prix."
+        },
+        "errors": {
+            "rate_limit_spam": "Trop de tentatives. Veuillez patienter une minute.",
+            "rate_limit_daily": "Limite quotidienne atteinte. Vous avez déjà négocié le maximum d'articles pour aujourd'hui.",
+            "rate_limit_hourly": "Trop d'offres pour cet article. Veuillez réessayer plus tard."
         }
     },
     "products": {

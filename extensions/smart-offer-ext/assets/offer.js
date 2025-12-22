@@ -65,6 +65,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     // Exit Intent
                     if (data.enableExitIntent) setupExitIntent();
+
+                    // Inactivity Trigger
+                    if (data.enableInactivityTrigger) setupInactivityTrigger();
                 }
             }
         } catch (e) {
@@ -80,6 +83,41 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
         document.addEventListener("mouseleave", onMouseLeave);
+    };
+
+    const setupInactivityTrigger = () => {
+        let inactivityTimer;
+        const INACTIVITY_LIMIT = 20000; // 20 seconds
+
+        const resetTimer = () => {
+            if (State.isOpen) return; // Stop tracking if already open
+            clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(() => {
+                if (!State.isOpen) {
+                    openChat();
+                    // Optional: remove listeners once triggered
+                    cleanup();
+                }
+            }, INACTIVITY_LIMIT);
+        };
+
+        const cleanup = () => {
+            document.removeEventListener("mousemove", resetTimer);
+            document.removeEventListener("keydown", resetTimer);
+            document.removeEventListener("scroll", resetTimer);
+            document.removeEventListener("click", resetTimer);
+            document.removeEventListener("touchstart", resetTimer);
+        };
+
+        // Listen for activity
+        document.addEventListener("mousemove", resetTimer);
+        document.addEventListener("keydown", resetTimer);
+        document.addEventListener("scroll", resetTimer);
+        document.addEventListener("click", resetTimer);
+        document.addEventListener("touchstart", resetTimer);
+
+        // Start initial timer
+        resetTimer();
     };
 
     // 2. Chat Logic (Optimistic UI)
@@ -151,6 +189,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 addMessage(data.message || `Deal! ${payload.offerPrice}€ accepted.`, "bot", true);
                 showActionBtn("Add to Cart & Pay", data);
                 lockInput();
+                break;
+
+            case 'ACCEPTED_DRAFT':
+                launchConfetti();
+                addMessage(data.message || "Offer accepted! A draft order has been created.", "bot", true);
+                // For VIP Draft, we do NOT show "Add to Cart". It's a manual invoice process.
+                // Maybe show a "Close" button or "Check Email" hint.
+                lockInput();
+                // Optional: Show specific UI for VIP
+                const btn = document.getElementById('so-action-btn');
+                if (btn) {
+                    btn.style.display = 'none'; // Ensure button is hidden
+                }
                 break;
 
             case 'REQUEST_EMAIL':

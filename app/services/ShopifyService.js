@@ -3,31 +3,26 @@ export const ShopifyService = {
   /**
    * Fetch Product Data (Price, CompareAtPrice, Collections)
    */
-  async getProductData(shopDomain, accessToken, productId) {
+  async getProductData(shopDomain, accessToken, productId, variantId = null) {
     const query = `
-          query getProduct($id: ID!) {
-            product(id: $id) {
-              title
-              priceRangeV2 {
-                minVariantPrice {
-                  amount
-                }
-              }
-              collections(first: 10) {
-                nodes {
-                  id
-                }
-              }
-    
-              variants(first: 1) {
-                nodes {
-                    compareAtPrice
-                    price
-                }
-              }
+      query getProduct($id: ID!) {
+        product(id: $id) {
+          title
+          collections(first: 5) {
+            nodes {
+              id
             }
           }
-        `;
+          variants(first: 20) {
+            nodes {
+              id
+              compareAtPrice
+              price
+            }
+          }
+        }
+      }
+    `;
 
     const variables = {
       id: `gid://shopify/Product/${productId}`
@@ -54,15 +49,28 @@ export const ShopifyService = {
         return { error: `Shopify API Error: ${errorMsg}` };
       }
 
-      const variant = json.data?.product?.variants?.nodes?.[0];
+      const variants = json.data?.product?.variants?.nodes || [];
       const collections = json.data?.product?.collections?.nodes?.map(n => n.id) || [];
+
+      // Find specific variant or default to first
+      let variant;
+      if (variantId) {
+        // Handle both numeric ID and GID
+        const gid = variantId.includes("gid://") ? variantId : `gid://shopify/ProductVariant/${variantId}`;
+        variant = variants.find(v => v.id === gid);
+      }
+
+      if (!variant) {
+        variant = variants[0];
+      }
 
       if (variant) {
         return {
           title: json.data?.product?.title,
           price: variant.price,
           compareAtPrice: variant.compareAtPrice,
-          collections
+          collections,
+          variantId: variant.id
         };
       }
 
@@ -149,6 +157,131 @@ export const ShopifyService = {
       return code;
     } catch (e) {
       console.error("ShopifyService: Network or parsing error", e);
+      return null;
+    }
+  },
+
+  /**
+   * Create a Draft Order (VIP Mode)
+   */
+  async createDraftOrder(shopDomain, accessToken, variantId, amount, email = null) {
+    const query = `
+      mutation draftOrderCreate($input: DraftOrderInput!) {
+        draftOrderCreate(input: $input) {
+          draftOrder {
+            id
+            invoiceUrl
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const variables = {
+      input: {
+        email: email,
+        note: "Commande issue d'une négociation (À Valider)",
+        tags: ["SmartOffer", "Negotiation_Draft"],
+        lineItems: [
+          {
+            variantId: variantId.includes("gid://") ? variantId : `gid://shopify/ProductVariant/${variantId}`,
+            quantity: 1,
+            appliedDiscount: {
+              value: Math.abs(amount).toFixed(2),
+              valueType: "FIXED_AMOUNT",
+              title: "Remise Négociée"
+            }
+          }
+        ]
+      }
+    };
+
+    try {
+      const response = await fetch(`https://${shopDomain}/admin/api/2025-10/graphql.json`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': accessToken
+        },
+        body: JSON.stringify({ query, variables })
+      });
+
+      const json = await response.json();
+
+      if (json.errors || json.data?.draftOrderCreate?.userErrors?.length > 0) {
+        console.error("ShopifyService: Draft Order Creation Error", json.errors || json.data.draftOrderCreate.userErrors);
+        return null;
+      }
+
+      return json.data?.draftOrderCreate?.draftOrder;
+    } catch (e) {
+      console.error("ShopifyService: Error creating draft order", e);
+      return null;
+    }
+  },
+
+  /**
+   * Create or update a customer in Shopify with 'Negotiator' tag
+   */
+  async createCustomer(shopDomain, accessToken, email, firstName = "", lastName = "") {
+    const query = `
+      mutation customerCreate($input: CustomerInput!) {
+        customerCreate(input: $input) {
+          customer {
+            id
+            email
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const variables = {
+      input: {
+        email: email,
+        firstName: firstName,
+        lastName: lastName,
+        tags: ["Negotiator", "SmartOffer"],
+        emailMarketingConsent: {
+          marketingState: "SUBSCRIBED",
+          marketingOptInLevel: "SINGLE_OPT_IN"
+        }
+      }
+    };
+
+    try {
+      const response = await fetch(`https://${shopDomain}/admin/api/2025-10/graphql.json`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': accessToken
+        },
+        body: JSON.stringify({ query, variables })
+      });
+
+      const json = await response.json();
+
+      if (json.data?.customerCreate?.userErrors?.length > 0) {
+        // If error is "Email has already been taken", it's fine, we should probably update tags then.
+        // But for MVP, we just ignore if they exist.
+        const errors = json.data.customerCreate.userErrors;
+        const emailTaken = errors.some(e => e.message.includes("taken"));
+
+        if (!emailTaken) {
+          console.error("ShopifyService: Customer Creation Errors:", JSON.stringify(errors, null, 2));
+        }
+        return null;
+      }
+
+      return json.data?.customerCreate?.customer?.id;
+    } catch (e) {
+      console.error("ShopifyService: Error creating customer", e);
       return null;
     }
   }

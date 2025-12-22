@@ -113,13 +113,34 @@ export const action = async ({ request }) => {
                         const lineItem = activeSub.lineItems.find(item => item.plan?.pricingDetails?.balanceUsed !== undefined);
 
                         if (lineItem) {
-                            await billing.createUsageRecord({
-                                subscriptionLineItemId: lineItem.id,
-                                price: { amount: commissionAmount, currencyCode: 'USD' },
-                                description: `Commission (${commissionRate * 100}%) for Order ${order.name}`,
-                                isTest: true,
-                            });
-                            console.log("Usage record created successfully.");
+                            try {
+                                const roundedCommission = Math.round(commissionAmount * 100) / 100;
+                                await billing.createUsageRecord({
+                                    subscriptionLineItemId: lineItem.id,
+                                    price: { amount: roundedCommission, currencyCode: 'USD' },
+                                    description: `Commission (${commissionRate * 100}%) for Order ${order.name}`,
+                                    isTest: true,
+                                });
+                                console.log(`Usage record created successfully: $${roundedCommission}`);
+                            } catch (billingError) {
+                                console.error("Billing Error:", billingError);
+                                // KILL SWITCH
+                                // If we can't charge, we must stop the service to prevent revenue loss
+                                // Detect if error is due to Capped Amount
+                                // Note: Error messages vary, but usually contain "usage limit"
+                                const errorString = String(billingError);
+                                if (errorString.includes("usage limit") || errorString.includes("maximum")) {
+                                    console.warn(`[BILLING ALERT] Shop ${shop} reached spending limit. Disabling active status.`);
+
+                                    await db.shop.update({
+                                        where: { shopUrl: shop },
+                                        data: {
+                                            isActive: false,
+                                            // Optional: Add a flag 'billingIssue: true' if you have it in schema
+                                        }
+                                    });
+                                }
+                            }
                         } else {
                             console.error("No usage line item found in subscription.");
                         }

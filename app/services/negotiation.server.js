@@ -70,7 +70,7 @@ export const NegotiationService = {
         });
 
         if (recentOffers >= MAX_OFFERS_PER_WINDOW) {
-            throw new Error("Trop de tentatives. Veuillez patienter une minute.");
+            throw new Error("RATE_LIMIT_SPAM");
         }
 
         // 2. Anti-Hoarding: Max 5 ACCEPTED offers per 24h globally for this session
@@ -85,7 +85,7 @@ export const NegotiationService = {
         });
 
         if (dailyAccepted >= 5) {
-            throw new Error("Limite quotidienne atteinte. Vous avez déjà négocié le maximum d'articles pour aujourd'hui.");
+            throw new Error("RATE_LIMIT_DAILY");
         }
 
         // 3. Anti-Brute-Force: Max 20 attempts per product per hour

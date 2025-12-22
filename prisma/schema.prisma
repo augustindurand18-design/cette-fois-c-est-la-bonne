@@ -54,6 +54,8 @@ model Shop {
   emailCounterBody     String  @default("<h2>New proposal for {productTitle}</h2><p>Your initial offer was a bit low, but we want to find a deal.</p><p>We can offer you this product for the exceptional price of:</p><h1 style='color: blue;'>{newPrice} €</h1><p><strong>Accept this offer:</strong> Use code <strong style='color: green;'>{code}</strong> at checkout.</p><p>(Valid until {endsAt})</p>")
 
   enableExitIntent Boolean @default(false)
+  enableInactivityTrigger Boolean @default(false)
+  fulfillmentMode String   @default("DISCOUNT_CODE") // 'DISCOUNT_CODE' or 'DRAFT_ORDER'
   rules         Rule[]
   offers      Offer[]
   gmailUser     String?
@@ -82,6 +84,9 @@ model Rule {
   minPrice       Float?   // Specific minimum accepted price override
   isEnabled      Boolean  @default(true)
   createdAt      DateTime @default(now())
+  
+  @@index([shopId, productId])
+  @@index([shopId, collectionId])
 }
 
 model Offer {
@@ -101,4 +106,7 @@ model Offer {
   orderId       String?
   createdAt     DateTime @default(now())
   counterPrice  Float?
+
+  @@index([sessionId])
+  @@index([code])
 }

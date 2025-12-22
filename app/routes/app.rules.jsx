@@ -36,7 +36,8 @@ export const loader = async ({ request }) => {
             maxRounds: 3,
             strategy: "moderate",
             allowSaleItems: true,
-            enableExitIntent: false
+            enableExitIntent: false,
+            enableInactivityTrigger: false
         };
     }
 
@@ -47,6 +48,8 @@ export const loader = async ({ request }) => {
         strategy: shop.strategy,
         allowSaleItems: shop.allowSaleItems,
         enableExitIntent: shop.enableExitIntent,
+        enableInactivityTrigger: shop.enableInactivityTrigger,
+        fulfillmentMode: shop.fulfillmentMode || "DISCOUNT_CODE",
         autoNegotiation: shop.autoNegotiation !== false,
         autoValidityDuration: shop.autoValidityDuration || 24,
         manualValidityDuration: shop.manualValidityDuration || 72,
@@ -66,6 +69,7 @@ export const action = async ({ request }) => {
         const strategy = formData.get("strategy");
         const allowSaleItems = formData.get("allowSaleItems") === "true";
         const enableExitIntent = formData.get("enableExitIntent") === "true";
+        const enableInactivityTrigger = formData.get("enableInactivityTrigger") === "true";
         const autoValidityDuration = parseInt(formData.get("autoValidityDuration"), 10);
         const manualValidityDuration = parseInt(formData.get("manualValidityDuration"), 10);
 
@@ -76,6 +80,7 @@ export const action = async ({ request }) => {
             strategy,
             allowSaleItems,
             enableExitIntent,
+            enableInactivityTrigger,
             autoNegotiationVal: formData.get("autoNegotiation")
         });
 
@@ -88,7 +93,9 @@ export const action = async ({ request }) => {
                 strategy,
                 allowSaleItems,
                 enableExitIntent,
+                enableInactivityTrigger,
                 autoNegotiation: formData.get("autoNegotiation") === "true",
+                fulfillmentMode: formData.get("fulfillmentMode"), // New Field
                 autoValidityDuration: !isNaN(autoValidityDuration) ? autoValidityDuration : 24,
                 manualValidityDuration: !isNaN(manualValidityDuration) ? manualValidityDuration : 72
             },
@@ -111,6 +118,8 @@ export default function RulesPage() {
     const [strategy, setStrategy] = useState(loaderData.strategy);
     const [allowSaleItems, setAllowSaleItems] = useState(loaderData.allowSaleItems);
     const [enableExitIntent, setEnableExitIntent] = useState(loaderData.enableExitIntent);
+    const [enableInactivityTrigger, setEnableInactivityTrigger] = useState(loaderData.enableInactivityTrigger);
+    const [fulfillmentMode, setFulfillmentMode] = useState(loaderData.fulfillmentMode);
     const [autoNegotiation, setAutoNegotiation] = useState(loaderData.autoNegotiation);
     const [autoValidity, setAutoValidity] = useState(loaderData.autoValidityDuration.toString());
     const [manualValidity, setManualValidity] = useState(loaderData.manualValidityDuration.toString());
@@ -127,12 +136,14 @@ export default function RulesPage() {
             strategy !== loaderData.strategy ||
             allowSaleItems !== loaderData.allowSaleItems ||
             enableExitIntent !== loaderData.enableExitIntent ||
+            enableInactivityTrigger !== loaderData.enableInactivityTrigger ||
+            fulfillmentMode !== loaderData.fulfillmentMode ||
             autoNegotiation !== loaderData.autoNegotiation ||
             autoValidity !== loaderData.autoValidityDuration.toString() ||
             manualValidity !== loaderData.manualValidityDuration.toString();
 
         setIsDirty(isModified);
-    }, [rounding, isActive, maxRounds, strategy, allowSaleItems, enableExitIntent, autoNegotiation, loaderData]);
+    }, [rounding, isActive, maxRounds, strategy, allowSaleItems, enableExitIntent, enableInactivityTrigger, fulfillmentMode, autoNegotiation, loaderData]);
 
     const handleSave = () => {
         fetcher.submit({
@@ -143,6 +154,8 @@ export default function RulesPage() {
             strategy: strategy,
             allowSaleItems: allowSaleItems.toString(),
             enableExitIntent: enableExitIntent.toString(),
+            enableInactivityTrigger: enableInactivityTrigger.toString(),
+            fulfillmentMode: fulfillmentMode,
             autoNegotiation: autoNegotiation.toString(),
             autoValidityDuration: autoValidity,
             manualValidityDuration: manualValidity
@@ -156,7 +169,7 @@ export default function RulesPage() {
             primaryAction={{
                 content: fetcher.state !== "idle" ? t('common.saving') : t('common.save'),
                 onAction: handleSave,
-                disabled: fetcher.state !== "idle",
+                disabled: !isDirty || fetcher.state !== "idle",
             }}
         >
             <Layout>
@@ -203,49 +216,76 @@ export default function RulesPage() {
                                         </BlockStack>
                                     </InlineStack>
                                 </Box>
-                            </BlockStack>
 
-                            <Box borderBlockStartWidth="025" borderColor="border-subdued" paddingBlockStart="400">
-                                <Text as="h3" variant="headingSm">{t('rules.validity_title')}</Text>
-                                <Box paddingBlockStart="200">
-                                    <FormLayout>
-                                        <FormLayout.Group>
-                                            <Select
-                                                label={t('rules.auto_validity')}
-                                                options={[
-                                                    { label: t('time.minutes', { count: 1 }), value: '1' },
-                                                    { label: t('time.minutes', { count: 2 }), value: '2' },
-                                                    { label: t('time.minutes', { count: 3 }), value: '3' },
-                                                    { label: t('time.minutes', { count: 4 }), value: '4' },
-                                                    { label: t('time.minutes', { count: 5 }), value: '5' },
-                                                    { label: t('time.minutes', { count: 6 }), value: '6' },
-                                                    { label: t('time.minutes', { count: 7 }), value: '7' },
-                                                    { label: t('time.minutes', { count: 8 }), value: '8' },
-                                                    { label: t('time.minutes', { count: 9 }), value: '9' },
-                                                    { label: t('time.minutes', { count: 10 }), value: '10' },
-                                                ]}
-                                                onChange={setAutoValidity}
-                                                value={autoValidity}
-                                                helpText={t('rules.auto_validity_help')}
-                                            />
-                                            <Select
-                                                label={t('rules.manual_validity')}
-                                                options={[
-                                                    { label: t('time.minutes', { count: 5 }), value: '5' },
-                                                    { label: t('time.minutes', { count: 15 }), value: '15' },
-                                                    { label: t('time.minutes', { count: 30 }), value: '30' },
-                                                    { label: t('time.minutes', { count: 45 }), value: '45' },
-                                                    { label: t('time.hours', { count: 1 }), value: '60' },
-                                                    { label: t('time.hours', { count: 2 }), value: '120' },
-                                                    { label: t('time.days', { count: 1 }), value: '1440' },
-                                                ]}
-                                                onChange={setManualValidity}
-                                                value={manualValidity}
-                                                helpText={t('rules.manual_validity_help')}
-                                            />
-                                        </FormLayout.Group>
-                                    </FormLayout>
+
+                                <Box borderBlockStartWidth="025" borderColor="border-subdued" paddingBlockStart="400">
+                                    <Text as="h3" variant="headingSm">{t('rules.validity_title')}</Text>
+                                    <Box paddingBlockStart="200">
+                                        <FormLayout>
+                                            <FormLayout.Group>
+                                                <Select
+                                                    label={t('rules.auto_validity')}
+                                                    options={[
+                                                        { label: t('time.minutes', { count: 1 }), value: '1' },
+                                                        { label: t('time.minutes', { count: 2 }), value: '2' },
+                                                        { label: t('time.minutes', { count: 3 }), value: '3' },
+                                                        { label: t('time.minutes', { count: 4 }), value: '4' },
+                                                        { label: t('time.minutes', { count: 5 }), value: '5' },
+                                                        { label: t('time.minutes', { count: 6 }), value: '6' },
+                                                        { label: t('time.minutes', { count: 7 }), value: '7' },
+                                                        { label: t('time.minutes', { count: 8 }), value: '8' },
+                                                        { label: t('time.minutes', { count: 9 }), value: '9' },
+                                                        { label: t('time.minutes', { count: 10 }), value: '10' },
+                                                    ]}
+                                                    onChange={setAutoValidity}
+                                                    value={autoValidity}
+                                                    helpText={t('rules.auto_validity_help')}
+                                                />
+                                                <Select
+                                                    label={t('rules.manual_validity')}
+                                                    options={[
+                                                        { label: t('time.minutes', { count: 5 }), value: '5' },
+                                                        { label: t('time.minutes', { count: 15 }), value: '15' },
+                                                        { label: t('time.minutes', { count: 30 }), value: '30' },
+                                                        { label: t('time.minutes', { count: 45 }), value: '45' },
+                                                        { label: t('time.hours', { count: 1 }), value: '60' },
+                                                        { label: t('time.hours', { count: 2 }), value: '120' },
+                                                        { label: t('time.days', { count: 1 }), value: '1440' },
+                                                    ]}
+                                                    onChange={setManualValidity}
+                                                    value={manualValidity}
+                                                    helpText={t('rules.manual_validity_help')}
+                                                />
+                                            </FormLayout.Group>
+                                        </FormLayout>
+                                    </Box>
                                 </Box>
+                            </BlockStack>
+                        </BlockStack>
+                    </Card>
+
+                    <Card>
+                        <BlockStack gap="400">
+                            <Text as="h2" variant="headingMd">Finalisation & Sécurité (Contrôle Marchand)</Text>
+                            <Box>
+                                <InlineStack align="start" gap="800">
+                                    <RadioButton
+                                        label="Paiement Immédiat (Standard)"
+                                        helpText="Le client paie immédiatement via un code promo."
+                                        checked={fulfillmentMode === 'DISCOUNT_CODE'}
+                                        id="modeStandard"
+                                        name="fulfillmentMode"
+                                        onChange={() => setFulfillmentMode('DISCOUNT_CODE')}
+                                    />
+                                    <RadioButton
+                                        label="Validation Manuelle (Recommandé > 1000€)"
+                                        helpText="Aucun paiement immédiat. Une commande brouillon est créée pour votre validation finale."
+                                        checked={fulfillmentMode === 'DRAFT_ORDER'}
+                                        id="modeDraft"
+                                        name="fulfillmentMode"
+                                        onChange={() => setFulfillmentMode('DRAFT_ORDER')}
+                                    />
+                                </InlineStack>
                             </Box>
                         </BlockStack>
                     </Card>
@@ -293,6 +333,13 @@ export default function RulesPage() {
                                 onChange={(val) => setEnableExitIntent(val)}
                                 helpText={t('rules.exit_intent_help')}
                             />
+
+                            <Checkbox
+                                label="Activer le déclencheur d'inactivité"
+                                checked={enableInactivityTrigger}
+                                onChange={(val) => setEnableInactivityTrigger(val)}
+                                helpText="Ouvre le chat automatiquement après 20 s d'inactivité."
+                            />
                         </BlockStack>
                     </Card>
 
@@ -317,7 +364,7 @@ export default function RulesPage() {
 
 
                 </Layout.Section>
-            </Layout>
-        </Page>
+            </Layout >
+        </Page >
     );
 }

@@ -53,6 +53,11 @@
             "invalid_offer": "I didn't understand your price. Can you give me an amount (e.g., 45)?",
             "sale_restriction": "Sorry, I cannot negotiate on items that are already on sale.",
             "min_limit_reached": "Sorry, I cannot go lower than {{price}} €. That is my final price."
+        },
+        "errors": {
+            "rate_limit_spam": "Too many attempts. Please wait a minute.",
+            "rate_limit_daily": "Daily limit reached. You have already negotiated the maximum number of items for today.",
+            "rate_limit_hourly": "Too many offers for this item. Please try again later."
         }
     },
     "dashboard": {

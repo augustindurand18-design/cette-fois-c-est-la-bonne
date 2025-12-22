@@ -72,6 +72,7 @@ export async function loader({ request }) {
         botIcon: shop.botIcon,
         isActive: shop.isActive,
         enableExitIntent: shop.enableExitIntent,
+        enableInactivityTrigger: shop.enableInactivityTrigger,
         isEligible
     }), {
         headers: { "Content-Type": "application/json" }
@@ -86,13 +87,26 @@ export async function action({ request }) {
         return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
     }
 
+    let t = (key) => key; // Fallback translator
+
     try {
         const body = await request.json();
-        const { productId, offerPrice, shopUrl, sessionId } = body;
 
-        if (!productId || !offerPrice || !shopUrl) {
-            return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
+        // --- SECURITY: Zod Validation ---
+        const Validation = await import("../validators.server").then(m => m.NegotiationSchema);
+        const result = Validation.safeParse(body);
+
+        if (!result.success) {
+            console.error("Negotiation API: Validation Error", result.error.format());
+            // Return specific validation message
+            return new Response(JSON.stringify({
+                error: "Invalid Data",
+                details: result.error.flatten().fieldErrors
+            }), { status: 400 });
         }
+
+        const { productId, variantId, offerPrice, shopUrl, sessionId, customerEmail } = result.data;
+        // ---------------------------------
 
         // 1. Verify Shop & Get Token
         const shop = await db.shop.findUnique({ where: { shopUrl } });
@@ -117,7 +131,7 @@ export async function action({ request }) {
             console.error("Failed to parse reactionMessages for shop:", shopUrl, e);
         }
 
-        const t = (key) => {
+        t = (key) => {
             // 1. Try Custom Shop Messages
             const parts = key.split('.');
             let customValue = customReactions;
@@ -190,8 +204,8 @@ export async function action({ request }) {
         }
 
         // 3. Fetch Product Data
-        console.log(`Negotiate API: Fetching data for product ${productId} on ${shop.shopUrl}`);
-        const productData = await ShopifyService.getProductData(shop.shopUrl, shop.accessToken, productId);
+        console.log(`Negotiate API: Fetching data for product ${productId} on ${shop.shopUrl} with variant ${variantId}`);
+        const productData = await ShopifyService.getProductData(shop.shopUrl, shop.accessToken, productId, variantId);
 
         if (!productData || productData.error) {
             console.error(`Negotiate API: Product data fetch failed for ${productId} on ${shop.shopUrl}`);
@@ -203,6 +217,8 @@ export async function action({ request }) {
         const compareAtPrice = productData.compareAtPrice ? parseFloat(productData.compareAtPrice) : null;
 
         // 4. Determine Rule
+        // Rules are attached to the generic Product ID, not the Variant ID.
+        // So we must use the Product GID to find the rule.
         const productGid = `gid://shopify/Product/${productId}`;
         let rule = await db.rule.findFirst({
             where: { shopId: shop.id, productId: productGid, isEnabled: true },
@@ -283,7 +299,7 @@ export async function action({ request }) {
         // --- MANUAL MODE INTERCEPTION ---
         // If shop has autoNegotiation disabled, we catch the offer here.
         if (shop.autoNegotiation === false) {
-            const { customerEmail } = body;
+            // Validated 'customerEmail' from Zod result is used here
 
             if (!customerEmail) {
                 // Step 1: Request Email
@@ -307,6 +323,11 @@ export async function action({ request }) {
                     },
                 });
 
+                // LEAD GEN STRATEGY: Create Customer in Shopify
+                if (customerEmail) {
+                    ShopifyService.createCustomer(shop.shopUrl, shop.accessToken, customerEmail).catch(err => console.error("Lead Gen Fail", err));
+                }
+
                 return {
                     status: "MANUAL_COMPLETED",
                     message: "Thank you! Your offer of " + offerValue + "€ has been sent to the merchant. We will contact you at " + customerEmail + " shortly."
@@ -328,7 +349,49 @@ export async function action({ request }) {
             // ACCEPT OFFER
             let discountAmount = originalPrice - offerValue;
             if (discountAmount < 0) discountAmount = 0;
+            discountAmount = Math.round(discountAmount * 100) / 100; // Fix precision
 
+            // --- VIP MODE: DRAFT ORDER ---
+            if (shop.fulfillmentMode === 'DRAFT_ORDER') {
+                console.log("Negotiate API: Creating Draft Order (VIP Mode)");
+
+                const draftOrder = await ShopifyService.createDraftOrder(
+                    shop.shopUrl,
+                    shop.accessToken,
+                    productData.variantId || productData.id || productId,
+                    discountAmount,
+                    customerEmail
+                );
+
+                if (!draftOrder) {
+                    return { status: "ERROR", error: "Échec de la réservation. Veuillez réessayer." };
+                }
+
+                await db.offer.create({
+                    data: {
+                        shopId: shop.id,
+                        offeredPrice: offerValue,
+                        status: "ACCEPTED_DRAFT", // New Status
+                        code: `DRAFT-${draftOrder.id.split('/').pop()}`, // Store Draft ID as code ref
+                        productTitle: productData.title,
+                        productId: productId,
+                        originalPrice: originalPrice,
+                        sessionId: sessionId,
+                    },
+                });
+
+                // Sync Customer (VIP usually creates customer via DraftOrder, but good to tag properly)
+                if (customerEmail) {
+                    ShopifyService.createCustomer(shop.shopUrl, shop.accessToken, customerEmail).catch(e => console.error("Lead Gen Error", e));
+                }
+
+                return {
+                    status: "ACCEPTED_DRAFT",
+                    message: "Offre acceptée ! Une commande a été pré-réservée pour vous. Le vendeur va la valider et vous recevrez un lien de paiement par email sous peu."
+                };
+            }
+
+            // --- STANDARD MODE: DISCOUNT CODE ---
             const code = `OFFER-${Math.floor(Math.random() * 1000000)}`;
             console.log("Negotiate API: Attempting to create discount", { code, discountAmount, productGid });
 
@@ -358,16 +421,23 @@ export async function action({ request }) {
                     productId: productId,
                     originalPrice: originalPrice,
                     sessionId: sessionId,
-                    customerEmail: body.customerEmail || null // Capture email if provided even in auto mode (optional)
                 },
             });
+
+            // LEAD GEN STRATEGY: Create Customer in Shopify
+            if (customerEmail) {
+                // Fire and forget (don't await to speed up response)
+                ShopifyService.createCustomer(shop.shopUrl, shop.accessToken, customerEmail).then(() => {
+                    console.log(`[LEAD GEN] Synced customer ${customerEmail} to Shopify.`);
+                });
+            }
 
             const successMsg = NegotiationService.getMessage('SUCCESS', offerValue.toFixed(2), t);
             return { status: "ACCEPTED", code, message: successMsg, validityDuration: durationMinutes };
 
         } else {
             // REJECT / COUNTER Logic
-            const attempt = body.round || 1;
+            const attempt = result.data.round || 1;
             const maxAttempts = shop.maxRounds || 3;
             const strategy = shop.strategy || 'moderate';
             const priceRounding = shop.priceRounding;
@@ -418,9 +488,26 @@ export async function action({ request }) {
 
     } catch (error) {
         console.error("Negotiation Error", error);
-        if (error.message && error.message.includes("Trop de tentatives")) {
-            return { status: "ERROR", error: error.message };
+
+        // Handle Rate Limit Errors with standardized codes
+        if (error.message === "RATE_LIMIT_SPAM") {
+            return { status: "REJECTED", message: t("negotiation.errors.rate_limit_spam") };
         }
+        if (error.message === "RATE_LIMIT_DAILY") {
+            return { status: "REJECTED", message: t("negotiation.errors.rate_limit_daily") };
+        }
+        if (error.message === "RATE_LIMIT_HOURLY") {
+            return { status: "REJECTED", message: t("negotiation.errors.rate_limit_hourly") };
+        }
+
+        // Fallback for older legacy messages (safety net)
+        if (error.message && (
+            error.message.includes("Trop de tentatives") ||
+            error.message.includes("Limite quotidienne")
+        )) {
+            return { status: "REJECTED", message: error.message };
+        }
+
         return new Response(JSON.stringify({ error: "Server Error" }), { status: 500, headers: { "Content-Type": "application/json" } });
     }
 }

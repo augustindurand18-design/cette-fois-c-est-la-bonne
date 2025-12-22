@@ -3,12 +3,20 @@ import { useEffect } from "react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
-import { authenticate } from "../shopify.server";
+import { authenticate, PLAN_STARTER, PLAN_GROWTH, PLAN_SCALE } from "../shopify.server";
 
 export const links = () => [];
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
+  const { billing } = await authenticate.admin(request);
+
+  // Check Billing
+  if (process.env.NODE_ENV === 'production') {
+    const billingCheck = await billing.require({
+      plans: [PLAN_STARTER, PLAN_GROWTH, PLAN_SCALE],
+      onFailure: async () => billing.request({ plan: PLAN_STARTER, isTest: true }),
+    });
+  }
 
   // eslint-disable-next-line no-undef
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };

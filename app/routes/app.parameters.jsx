@@ -81,10 +81,10 @@ export default function ParametersPage() {
 
     useEffect(() => {
         const isModified =
-            gmailUser !== (loaderData.gmailUser || "") ||
+            String(gmailUser) !== String(loaderData.gmailUser || "") ||
             (gmailAppPassword !== "********" && gmailAppPassword !== "") ||
-            smtpHost !== (loaderData.smtpHost || "") ||
-            smtpPort !== (loaderData.smtpPort || 587);
+            String(smtpHost) !== String(loaderData.smtpHost || "") ||
+            String(smtpPort) !== String(loaderData.smtpPort || 587);
 
         setIsDirty(isModified);
     }, [gmailUser, gmailAppPassword, smtpHost, smtpPort, loaderData]);
