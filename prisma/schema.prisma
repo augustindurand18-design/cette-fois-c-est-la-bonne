@@ -62,6 +62,13 @@ model Shop {
   smtpPort      Int      @default(587)
   autoValidityDuration Int @default(24) // Hours
   manualValidityDuration Int @default(72) // Hours
+  reactionMessages String? // JSON string for customized negotiation reactions
+  
+  // Billing & Usage
+  plan             String   @default("FREE") // FREE, PRO, ELITE
+  negotiationCount Int      @default(0)
+  lastResetDate    DateTime @default(now())
+
   createdAt   DateTime @default(now())
 }
 

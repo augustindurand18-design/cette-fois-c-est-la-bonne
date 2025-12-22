@@ -82,104 +82,6 @@ export async function action({ request }) {
     console.log("Negotiate API: Request Received", request.method);
     await authenticate.public.appProxy(request);
 
-    // Initialize/Get translator
-    // For now, we default to 'fr' but the structure supports dynamic language
-    // In a real Remix app with i18next, we would use a specialized server adapter.
-    // If i18n definition is isomorphic, we can just use the instance.
-    // We assume backend resources are loaded or we load them here?
-    // app/i18n.js uses HttpBackend which might not work on server without absolute URL or FS backend.
-    // QUICK FIX: Since we just want to extract strings, we'll assume the translation keys 
-    // are enough if we were just sending keys to frontend. BUT we are sending message TEXT.
-    // So we need the text.
-    // To avoid breaking the app if i18next http backend fails on server, 
-    // I will hardcode a helper that reads from the JSON we just edited for this specific usage,
-    // OR we rely on i18next if it's already working. 
-    // Given the complexity of setting up server-side i18next if not present, and the user request 
-    // was simple "extract text", I will try to use the imported `i18n` if initialized, 
-    // but likely it needs to wait for init.
-
-    // Safer approach for this refactor without breaking server env:
-    // Create a simple local helper that loads the FR json for now as default, 
-    // ensuring we don't regress validation. 
-
-    // Actually, looking at `i18n.js`, it uses `i18next-http-backend`. This fails on Node usually without polyfill.
-    // So I will assume we stick to "fr" for now by importing the JSON directly in the server file 
-    // to guarantee it works. This is "hardcoded" but into a file, which matches the "extract" requirement.
-    // Longer term, proper i18next-fs-backend is needed.
-
-    // Let's import the FR translation directly to be safe and robust.
-    // Note: Importing JSON in ESM/Remix might need assertions or just work.
-
-    const t = (key, options) => {
-        // Very basic implementation to mimic i18next `t` for our specific structure
-        // key: "negotiation.reactions.SHOCKED"
-        // Return array or string? NegotiationService expects array for `returnObjects: true`
-
-        // We will read from the file we just edited.
-        // Since we cannot easily `import` json dynamically without build step config in some envs,
-        // let's rely on a require or just hardcode the lookup logic against a loaded object.
-
-        // For simplicity and robustness during this refactor step, I will use a helper that 
-        // maps the keys to the arrays we defined.
-
-        // To truly support i18n, we should have a `db.language` or passed param.
-        // Here we default to 'fr'.
-
-        const enTranslations = {
-            negotiation: {
-                reactions: {
-                    SHOCKED: [
-                        "This offer is significantly below our expectations. However, we can offer you {{price}} €.",
-                        "Unfortunately we cannot accept such a low offer. The product deserves better. I propose {{price}} €.",
-                        "This price is too far from the item's value. We could go down to {{price}} €.",
-                        "Your offer is a bit too aggressive. Can we agree on {{price}} €?",
-                        "We are open to negotiation, but this amount is insufficient. How about {{price}} €?"
-                    ],
-                    LOW: [
-                        "I appreciate the effort, but we can't go that low. Our best offer is {{price}} €.",
-                        "We're getting closer, but this price is still below our limit. I can let it go for {{price}} €.",
-                        "I can't validate this amount, but I'm sure we can find a deal at {{price}} €.",
-                        "Your offer is interesting but still a bit tight. I propose {{price}} €.",
-                        "We are almost there. A little more effort? I can go down to {{price}} €."
-                    ],
-                    CLOSE: [
-                        "We are very close to a deal. Another small step towards {{price}} €?",
-                        "Your offer is tempting. If you accept {{price}} €, we have a deal.",
-                        "We are reaching the goal. Would you agree to {{price}} €?",
-                        "The gap is minimal. I can make you a final proposal at {{price}} €.",
-                        "It's almost validated. Let's agree on {{price}} €."
-                    ],
-                    SUCCESS: [
-                        "It's agreed. We accept your offer with pleasure.",
-                        "Deal concluded. You benefit from this preferential rate.",
-                        "It's a fair offer. We are delighted to accept it.",
-                        "Proposal validated. Thank you for this constructive negotiation.",
-                        "It's okay for us. Enjoy your purchase."
-                    ],
-                    HIGH: [
-                        "No need to offer more, the current price is {{price}} €.",
-                        "The displayed price is already {{price}} €, you won't pay more.",
-                        "Our price is {{price}} €, we don't take higher bids."
-                    ],
-                    invalid_offer: "I didn't understand your price. Can you give me an amount (e.g. 45)?",
-                    sale_restriction: "Sorry, I cannot negotiate on already discounted items.",
-                    min_limit_reached: "Sorry, I cannot go lower than {{price}} €. That's my final price."
-                }
-            }
-        };
-
-        const parts = key.split('.');
-        let value = enTranslations;
-        for (const part of parts) {
-            value = value?.[part];
-        }
-
-        if (!value) return key; // Fallback to key
-
-        return value;
-    };
-
-
     if (request.method !== "POST") {
         return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
     }
@@ -202,6 +104,77 @@ export async function action({ request }) {
             console.error("Negotiate API: Missing Access Token for shop", shop.shopUrl);
             return { status: "ERROR", error: "Le jeton d'accès est manquant. Veuillez réinstaller l'application." };
         }
+
+        // Initialize Translator with Shop Settings
+        let customReactions = {};
+        try {
+            if (shop.reactionMessages) {
+                customReactions = JSON.parse(shop.reactionMessages);
+            }
+        } catch (e) {
+            console.error("Failed to parse reactionMessages for shop:", shopUrl, e);
+        }
+
+        const t = (key) => {
+            // 1. Try Custom Shop Messages
+            const parts = key.split('.');
+            let customValue = customReactions;
+            for (const part of parts) {
+                customValue = customValue?.[part];
+            }
+            if (customValue) return customValue;
+
+            // 2. Fallback to English Defaults
+            const enTranslations = {
+                negotiation: {
+                    reactions: {
+                        SHOCKED: [
+                            "This offer is significantly below our expectations. However, we can offer you {{price}} €.",
+                            "Unfortunately we cannot accept such a low offer. The product deserves better. I propose {{price}} €.",
+                            "This price is too far from the item's value. We could go down to {{price}} €.",
+                            "Your offer is a bit too aggressive. Can we agree on {{price}} €?",
+                            "We are open to negotiation, but this amount is insufficient. How about {{price}} €?"
+                        ],
+                        LOW: [
+                            "I appreciate the effort, but we can't go that low. Our best offer is {{price}} €.",
+                            "We're getting closer, but this price is still below our limit. I can let it go for {{price}} €.",
+                            "I can't validate this amount, but I'm sure we can find a deal at {{price}} €.",
+                            "Your offer is interesting but still a bit tight. I propose {{price}} €.",
+                            "We are almost there. A little more effort? I can go down to {{price}} €."
+                        ],
+                        CLOSE: [
+                            "We are very close to a deal. Another small step towards {{price}} €?",
+                            "Your offer is tempting. If you accept {{price}} €, we have a deal.",
+                            "We are reaching the goal. Would you agree to {{price}} €?",
+                            "The gap is minimal. I can make you a final proposal at {{price}} €.",
+                            "It's almost validated. Let's agree on {{price}} €."
+                        ],
+                        SUCCESS: [
+                            "It's agreed. We accept your offer with pleasure.",
+                            "Deal concluded. You benefit from this preferential rate.",
+                            "It's a fair offer. We are delighted to accept it.",
+                            "Proposal validated. Thank you for this constructive negotiation.",
+                            "It's okay for us. Enjoy your purchase."
+                        ],
+                        HIGH: [
+                            "No need to offer more, the current price is {{price}} €.",
+                            "The displayed price is already {{price}} €, you won't pay more.",
+                            "Our price is {{price}} €, we don't take higher bids."
+                        ],
+                        invalid_offer: "I didn't understand your price. Can you give me an amount (e.g. 45)?",
+                        sale_restriction: "Sorry, I cannot negotiate on already discounted items.",
+                        min_limit_reached: "Sorry, I cannot go lower than {{price}} €. That's my final price."
+                    }
+                }
+            };
+
+            let fallbackValue = enTranslations;
+            for (const part of parts) {
+                fallbackValue = fallbackValue?.[part];
+            }
+
+            return fallbackValue || key;
+        };
 
         // 2. Rate Limit Check
         if (sessionId) {

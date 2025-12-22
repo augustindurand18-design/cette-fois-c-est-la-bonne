@@ -16,10 +16,12 @@ import {
     InlineStack,
     InlineGrid,
 } from "@shopify/polaris";
+// import { Modal, TitleBar, ResourcePicker } from "@shopify/app-bridge-react"; // ResourcePicker native not supported for images
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { useTranslation } from "react-i18next";
-import { ChatIcon, EmailIcon } from "@shopify/polaris-icons";
+import { ChatIcon, EmailIcon, LanguageIcon, DeleteIcon } from "@shopify/polaris-icons";
+import { useSubmit } from "react-router"; // Fix for fetcher.submit vs useSubmit
 
 export const loader = async ({ request }) => {
     const { session } = await authenticate.admin(request);
@@ -51,6 +53,7 @@ export const loader = async ({ request }) => {
         emailRejectedBody: shop.emailRejectedBody,
         emailCounterSubject: shop.emailCounterSubject,
         emailCounterBody: shop.emailCounterBody,
+        reactionMessages: shop.reactionMessages || "{}"
     };
 };
 
@@ -78,6 +81,7 @@ export const action = async ({ request }) => {
         emailRejectedBody: formData.get("emailRejectedBody"),
         emailCounterSubject: formData.get("emailCounterSubject"),
         emailCounterBody: formData.get("emailCounterBody"),
+        reactionMessages: formData.get("reactionMessages"),
     };
 
     await db.shop.update({
@@ -96,40 +100,145 @@ export default function CustomizationPage() {
     const TONE_PRESETS = {
         standard: {
             label: t('customization.tones.standard'),
-            welcome: t('customization.presets.standard.welcome'),
-            reject: t('customization.presets.standard.reject'),
-            success: t('customization.presets.standard.success')
+            welcome: "Hello! 👋 I can offer you a discount if you propose a reasonable price. What is your price?",
+            reject: "Hmm, that's too low. I can go down to {price}€.", // Legacy fallback
+            success: "It's a deal for {price}€ ! 🎉", // Legacy fallback
+            reactions: {
+                SHOCKED: [
+                    "This offer is significantly below our expectations. However, we can offer you {{price}} €.",
+                    "Unfortunately we cannot accept such a low offer. The product deserves better. I propose {{price}} €.",
+                    "This price is too far from the item's value. We could go down to {{price}} €."
+                ],
+                LOW: [
+                    "I appreciate the effort, but we can't go that low. Our best offer is {{price}} €.",
+                    "We're getting closer, but this price is still below our limit. I can let it go for {{price}} €.",
+                    "I can't validate this amount, but I'm sure we can find a deal at {{price}} €."
+                ],
+                CLOSE: [
+                    "We are very close to a deal. Another small step towards {{price}} €?",
+                    "Your offer is tempting. If you accept {{price}} €, we have a deal.",
+                    "We are reaching the goal. Would you agree to {{price}} €?"
+                ],
+                SUCCESS: [
+                    "It's agreed. We accept your offer with pleasure.",
+                    "Deal concluded. You benefit from this preferential rate.",
+                    "It's a fair offer. We are delighted to accept it."
+                ],
+                HIGH: [
+                    "No need to offer more, the current price is {{price}} €."
+                ],
+                invalid_offer: "I didn't understand your price. Can you give me an amount (e.g. 45)?",
+                sale_restriction: "Sorry, I cannot negotiate on already discounted items.",
+                min_limit_reached: "Sorry, I cannot go lower than {{price}} €. That's my final price."
+            }
         },
         friendly: {
             label: t('customization.tones.friendly'),
-            welcome: t('customization.presets.friendly.welcome'),
-            reject: t('customization.presets.friendly.reject'),
-            success: t('customization.presets.friendly.success')
+            welcome: "Hey there! 😊 Use me to get a sweet deal! Make an offer!",
+            reject: "Ouch, that's a bit low! 😅 I can do {price}€.",
+            success: "YAY! Deal! 🥳 Enjoy for {price}€!",
+            reactions: {
+                SHOCKED: [
+                    "Whoa! That's super low! 😅 I can do {{price}} € though!",
+                    "You're kidding right? 😉 Let's try {{price}} € instead.",
+                    "I'd love to say yes, but I can't go that low! How about {{price}} €?"
+                ],
+                LOW: [
+                    "Getting warmer! 🔥 But I need a bit more. How about {{price}} €?",
+                    "Nice try! 😉 I can meet you at {{price}} €.",
+                    "Almost there! Can you do {{price}} €?"
+                ],
+                CLOSE: [
+                    "So close! Just a tiny bit more? {{price}} €?",
+                    "We are practically there! Say yes to {{price}} €? 🤞",
+                    "I'm feeling generous! {{price}} € and it's yours!"
+                ],
+                SUCCESS: [
+                    "YAY! It's a deal! 🥳",
+                    "Woohoo! Accepted! 🎉",
+                    "Awesome! Enjoy your deal! 💖"
+                ],
+                HIGH: [
+                    "Whoa, easy tiger! The price is only {{price}} €! 😉"
+                ],
+                invalid_offer: "Oops! I didn't verify that. Just type a number please! 🔢",
+                sale_restriction: "Oh no! This item is already on super sale! 🛑",
+                min_limit_reached: "I really can't go lower than {{price}} €! 🥺"
+            }
         },
         professional: {
             label: t('customization.tones.professional'),
-            welcome: t('customization.presets.professional.welcome'),
-            reject: t('customization.presets.professional.reject'),
-            success: t('customization.presets.professional.success')
+            welcome: "Welcome. We authorize negotiation on this item. Please submit your best offer.",
+            reject: "We cannot accept this offer. Our counter-proposal is {price}€.",
+            success: "Offer accepted. The price is set at {price}€.",
+            reactions: {
+                SHOCKED: [
+                    "This offer is below our acceptable margin. Counter-offer: {{price}} €.",
+                    "We differ significantly on the valuation. We propose {{price}} €.",
+                    "This is outside our negotiation range. We can offer {{price}} €."
+                ],
+                LOW: [
+                    "We acknowledge your offer but require {{price}} €.",
+                    "This is slightly below our limit. We can accept {{price}} €.",
+                    "Please revise your offer to {{price}} € for acceptance."
+                ],
+                CLOSE: [
+                    "We are pending agreement. {{price}} € would be accepted.",
+                    "Approaching final agreement price of {{price}} €.",
+                    "A final adjustment to {{price}} € is required."
+                ],
+                SUCCESS: [
+                    "Offer accepted. Proceeding to checkout.",
+                    "Deal confirmed.",
+                    "Proposal validated."
+                ],
+                HIGH: [
+                    "The list price is {{price}} €. Please bid lower."
+                ],
+                invalid_offer: "Invalid input. Please enter a numerical value.",
+                sale_restriction: "Negotiation is not applicable to discounted inventory.",
+                min_limit_reached: "Final floor price reached: {{price}} €."
+            }
         },
         minimalist: {
             label: t('customization.tones.minimalist'),
-            welcome: t('customization.presets.minimalist.welcome'),
-            reject: t('customization.presets.minimalist.reject'),
-            success: t('customization.presets.minimalist.success')
+            welcome: "Negotiate your price.",
+            reject: "Too low. {price}€.",
+            success: "Agreed. {price}€.",
+            reactions: {
+                SHOCKED: [
+                    "Too low. {{price}} €.",
+                    "No. {{price}} €.",
+                    "Impossible. {{price}} €."
+                ],
+                LOW: [
+                    "Higher. {{price}} €.",
+                    "Not enough. {{price}} €.",
+                    "Try {{price}} €."
+                ],
+                CLOSE: [
+                    "Almost. {{price}} €.",
+                    "Close. {{price}} €.",
+                    "{{price}} €?"
+                ],
+                SUCCESS: [
+                    "Agreed.",
+                    "Done.",
+                    "Accepted."
+                ],
+                HIGH: [
+                    "Max {{price}} €."
+                ],
+                invalid_offer: "Number only.",
+                sale_restriction: "No negotiation.",
+                min_limit_reached: "Min {{price}} €."
+            }
         }
     };
 
     // Initial Values
-    // Note: If loaderData has values, we use them. If not, we fallback to standard preset.
-    // BUT since we just changed presets to English in 'en', if the DB has French values stored, 
-    // the user will still see French in the inputs by default unless we detect it's "standard" french 
-    // and replace it. But we cannot easily know if it's the "original" french.
-    // The user said "admin en anglais". The texts that come from DB (user saved settings) 
-    // are content, not UI. But if the user hasn't saved anything yet, or wants to reset, 
-    // they should see English presets.
-    // For now, new selection of presets will yield English.
     const initialWelcome = loaderData.botWelcomeMsg || TONE_PRESETS.standard.welcome;
+    // We keep these for legacy/fallback but mainly focus on reactions now
     const initialReject = loaderData.botRejectMsg || TONE_PRESETS.standard.reject;
     const initialSuccess = loaderData.botSuccessMsg || TONE_PRESETS.standard.success;
 
@@ -220,27 +329,7 @@ export default function CustomizationPage() {
 
     const [isDirty, setIsDirty] = useState(false);
 
-    useEffect(() => {
-        const isModified =
-            welcomeMsg !== initialWelcome ||
-            rejectMsg !== initialReject ||
-            successMsg !== initialSuccess ||
-            color !== (loaderData.widgetColor || "#000000") ||
-            botIcon !== (loaderData.botIcon || "") ||
-            emailFont !== (loaderData.emailFont || "Arial, sans-serif") ||
-            emailPrimaryColor !== (loaderData.emailPrimaryColor || "#008060") ||
-            emailAcceptedSubject !== (loaderData.emailAcceptedSubject || "Your offer has been accepted! 🎉") ||
-            emailAcceptedBody !== (loaderData.emailAcceptedBody || "") ||
-            emailRejectedSubject !== (loaderData.emailRejectedSubject || "Update on your offer") ||
-            emailRejectedBody !== (loaderData.emailRejectedBody || "") ||
-            emailCounterSubject !== (loaderData.emailCounterSubject || "Counter-offer for your request") ||
-            emailCounterBody !== (loaderData.emailCounterBody || "");
 
-        setIsDirty(isModified);
-    }, [
-        welcomeMsg, rejectMsg, successMsg, color, botIcon, initialWelcome, initialReject, initialSuccess, loaderData,
-        emailFont, emailPrimaryColor, emailAcceptedSubject, emailAcceptedBody, emailRejectedSubject, emailRejectedBody, emailCounterSubject, emailCounterBody
-    ]);
 
     // Detect Tone
     const [tone, setTone] = useState(() => {
@@ -255,8 +344,11 @@ export default function CustomizationPage() {
         }
         return "custom";
     });
-    const [file, setFile] = useState(null);
 
+
+
+
+    const [file, setFile] = useState(null);
     const handleDrop = useCallback(
         (_droppedFiles, acceptedFiles, _rejectedFiles) => {
             const file = acceptedFiles[0];
@@ -271,15 +363,96 @@ export default function CustomizationPage() {
         },
         [],
     );
+    // Helper to verify if botIcon is valid for preview (mostly simply truthy check + data/https)
+    const botiConPreview = botIcon && (botIcon.startsWith('data:') || botIcon.startsWith('http'));
 
     const handleToneChange = (newTone) => {
         setTone(newTone);
         if (TONE_PRESETS[newTone]) {
+            // Update Legacy Fields
             setWelcomeMsg(TONE_PRESETS[newTone].welcome);
             setRejectMsg(TONE_PRESETS[newTone].reject);
             setSuccessMsg(TONE_PRESETS[newTone].success);
+
+            // Update New JSON Fields
+            const presetReactions = TONE_PRESETS[newTone].reactions;
+            const newStructure = {
+                negotiation: {
+                    reactions: JSON.parse(JSON.stringify(presetReactions)) // Deep copy
+                }
+            };
+            setReactionMessages(newStructure);
         }
     };
+
+    // Reaction Messages State
+    const [reactionMessages, setReactionMessages] = useState(() => {
+        try {
+            const parsed = JSON.parse(loaderData.reactionMessages || "{}");
+            // Ensure structure exists
+            if (!parsed.negotiation) parsed.negotiation = {};
+            if (!parsed.negotiation.reactions) parsed.negotiation.reactions = {};
+            return parsed;
+        } catch (e) {
+            return { negotiation: { reactions: {} } };
+        }
+    });
+
+    const handleReactionChange = (category, value, index = null) => {
+        const newReactions = { ...reactionMessages };
+        if (!newReactions.negotiation) newReactions.negotiation = { reactions: {} };
+        if (!newReactions.negotiation.reactions) newReactions.negotiation.reactions = {};
+
+        if (Array.isArray(newReactions.negotiation.reactions[category])) {
+            // It's an array (SHOCKED, LOW, etc.)
+            if (index !== null) {
+                newReactions.negotiation.reactions[category][index] = value;
+            }
+        } else {
+            // String value
+            newReactions.negotiation.reactions[category] = value;
+        }
+        setReactionMessages(newReactions);
+    };
+
+    const addReactionVariant = (category) => {
+        const newReactions = { ...reactionMessages };
+        if (!newReactions.negotiation.reactions[category]) newReactions.negotiation.reactions[category] = [];
+        newReactions.negotiation.reactions[category].push("");
+        setReactionMessages(newReactions);
+    };
+
+    const removeReactionVariant = (category, index) => {
+        const newReactions = { ...reactionMessages };
+        if (newReactions.negotiation.reactions[category]) {
+            newReactions.negotiation.reactions[category].splice(index, 1);
+        }
+        setReactionMessages(newReactions);
+    };
+
+    useEffect(() => {
+        const isModified =
+            welcomeMsg !== initialWelcome ||
+            rejectMsg !== initialReject ||
+            successMsg !== initialSuccess ||
+            color !== (loaderData.widgetColor || "#000000") ||
+            botIcon !== (loaderData.botIcon || "") ||
+            emailFont !== (loaderData.emailFont || "Arial, sans-serif") ||
+            emailPrimaryColor !== (loaderData.emailPrimaryColor || "#008060") ||
+            emailAcceptedSubject !== (loaderData.emailAcceptedSubject || "Your offer has been accepted! 🎉") ||
+            emailAcceptedBody !== (loaderData.emailAcceptedBody || "") ||
+            emailRejectedSubject !== (loaderData.emailRejectedSubject || "Update on your offer") ||
+            emailRejectedBody !== (loaderData.emailRejectedBody || "") ||
+            emailCounterSubject !== (loaderData.emailCounterSubject || "Counter-offer for your request") ||
+            emailCounterBody !== (loaderData.emailCounterBody || "") ||
+            JSON.stringify(reactionMessages) !== (loaderData.reactionMessages || "{}");
+
+        setIsDirty(isModified);
+    }, [
+        welcomeMsg, rejectMsg, successMsg, color, botIcon, initialWelcome, initialReject, initialSuccess, loaderData,
+        emailFont, emailPrimaryColor, emailAcceptedSubject, emailAcceptedBody, emailRejectedSubject, emailRejectedBody, emailCounterSubject, emailCounterBody,
+        reactionMessages
+    ]);
 
     const handleSave = () => {
         let formData = new FormData();
@@ -296,11 +469,38 @@ export default function CustomizationPage() {
         formData.append("emailRejectedBody", emailRejectedBody);
         formData.append("emailCounterSubject", emailCounterSubject);
         formData.append("emailCounterBody", emailCounterBody);
+        formData.append("reactionMessages", JSON.stringify(reactionMessages));
 
         fetcher.submit(formData, { method: "POST" });
     };
 
     const [selectedTab, setSelectedTab] = useState(0);
+
+    // Helper for Reaction Arrays
+    const renderReactionList = (category, title) => {
+        const items = reactionMessages?.negotiation?.reactions?.[category] || [];
+        return (
+            <Box paddingBlockEnd="400">
+                <Text variant="headingSm" as="h6">{title}</Text>
+                <div style={{ marginTop: '10px' }}>
+                    {items.map((msg, idx) => (
+                        <div key={idx} style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                            <div style={{ flexGrow: 1 }}>
+                                <TextField
+                                    value={msg}
+                                    onChange={(val) => handleReactionChange(category, val, idx)}
+                                    autoComplete="off"
+                                    multiline={2}
+                                />
+                            </div>
+                            <Button tone="critical" onClick={() => removeReactionVariant(category, idx)}>Remove</Button>
+                        </div>
+                    ))}
+                    <Button onClick={() => addReactionVariant(category)}>+ Add Variant</Button>
+                </div>
+            </Box>
+        );
+    };
 
     return (
         <Page
@@ -316,7 +516,7 @@ export default function CustomizationPage() {
                 <Layout.Section>
                     <Card padding="0">
                         <div style={{ padding: '16px', borderBottom: '1px solid #e1e3e5', background: '#f9fafb' }}>
-                            <InlineGrid columns={2} gap="400">
+                            <InlineGrid columns={3} gap="400">
                                 <Button
                                     pressed={selectedTab === 0}
                                     variant={selectedTab === 0 ? "primary" : undefined}
@@ -325,29 +525,39 @@ export default function CustomizationPage() {
                                     icon={ChatIcon}
                                     fullWidth
                                 >
-                                    Chatbot Widget
+                                    Appearance
                                 </Button>
                                 <Button
                                     pressed={selectedTab === 1}
                                     variant={selectedTab === 1 ? "primary" : undefined}
                                     onClick={() => setSelectedTab(1)}
                                     size="large"
+                                    icon={LanguageIcon}
+                                    fullWidth
+                                >
+                                    Conversation
+                                </Button>
+                                <Button
+                                    pressed={selectedTab === 2}
+                                    variant={selectedTab === 2 ? "primary" : undefined}
+                                    onClick={() => setSelectedTab(2)}
+                                    size="large"
                                     icon={EmailIcon}
                                     fullWidth
                                 >
-                                    Email Templates
+                                    Emails
                                 </Button>
                             </InlineGrid>
                         </div>
 
                         <Box padding="400">
+                            {/* TAB 0: APPEARANCE */}
                             {selectedTab === 0 && (
                                 <BlockStack gap="500">
-                                    <Text as="h2" variant="headingMd">Chatbot Configuration</Text>
-
                                     <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginBottom: "2rem" }}>
                                         {/* Left Column: Settings */}
-                                        <div style={{ flex: "1 1 300px" }}>
+                                        <div style={{ flex: "1 1 400px" }}>
+                                            <Text as="h2" variant="headingMd">Widget Appearance</Text>
                                             <FormLayout>
                                                 <Box paddingBlockEnd="400">
                                                     <Text variant="headingSm" as="h6">{t('customization.widget_color')}</Text>
@@ -389,121 +599,289 @@ export default function CustomizationPage() {
                                                         </div>
                                                     </div>
                                                 </Box>
-
                                                 <Box paddingBlockEnd="400">
                                                     <Text variant="headingSm" as="h6" paddingBlockEnd="200">{t('customization.profile_pic')}</Text>
-                                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                                                        {botIcon && (
-                                                            <Thumbnail source={botIcon} alt="Bot Icon" size="medium" />
-                                                        )}
-                                                        <div style={{ flexGrow: 1 }}>
-                                                            <TextField
-                                                                label={t('customization.url_label')}
-                                                                value={botIcon}
-                                                                onChange={setBotIcon}
-                                                                autoComplete="off"
-                                                                placeholder="https://..."
-                                                            />
-                                                            <div style={{ marginTop: '10px' }}>
-                                                                <DropZone onDrop={handleDrop} accept="image/*" type="image" allowMultiple={false} label={t('customization.upload_label')}>
-                                                                    {(!botIcon && !file) && <DropZone.FileUpload />}
-                                                                </DropZone>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                                        {botiConPreview ? (
+                                                            <div style={{ position: "relative" }}>
+                                                                <Thumbnail source={botIcon} alt="Bot Icon" size="large" />
+                                                                <div style={{ position: "absolute", top: -8, right: -8 }}>
+                                                                    <Button
+                                                                        icon={DeleteIcon}
+                                                                        onClick={() => setBotIcon("")}
+                                                                        accessibilityLabel="Remove image"
+                                                                        size="micro"
+                                                                        tone="critical"
+                                                                        variant="primary"
+                                                                    />
+                                                                </div>
                                                             </div>
+                                                        ) : (
+                                                            <div style={{
+                                                                width: "60px",
+                                                                height: "60px",
+                                                                backgroundColor: "#f1f2f4",
+                                                                borderRadius: "8px",
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                justifyContent: "center",
+                                                                border: "1px dashed #babfc3"
+                                                            }}>
+                                                                <span style={{ fontSize: "24px", opacity: 0.5 }}>🤖</span>
+                                                            </div>
+                                                        )}
+
+                                                        <div style={{ flexGrow: 1 }}>
+                                                            <DropZone onDrop={handleDrop} allowMultiple={false} variableHeight>
+                                                                <DropZone.FileUpload actionTitle={t('customization.upload_label') || "Upload Image"} />
+                                                            </DropZone>
+                                                            <Text variant="bodyXs" tone="subdued" as="p" alignment="center">
+                                                                Recommended: Square image, PNG or JPG.
+                                                            </Text>
                                                         </div>
                                                     </div>
-                                                </Box>
-
-                                                <Box paddingBlockStart="400" borderBlockStartWidth="025" borderColor="border-subdued">
-                                                    <Text variant="headingMd" as="h3" paddingBlockEnd="400">Message Settings</Text>
-                                                    <Select
-                                                        label={t('customization.tone_label')}
-                                                        options={[
-                                                            { label: t('customization.tones.custom'), value: 'custom' },
-                                                            { label: t('customization.tones.standard'), value: 'standard' },
-                                                            { label: t('customization.tones.friendly'), value: 'friendly' },
-                                                            { label: t('customization.tones.professional'), value: 'professional' },
-                                                            { label: t('customization.tones.minimalist'), value: 'minimalist' },
-                                                        ]}
-                                                        onChange={handleToneChange}
-                                                        value={tone}
-                                                    />
-                                                    <TextField
-                                                        label={t('customization.welcome_msg')}
-                                                        value={welcomeMsg}
-                                                        onChange={(val) => { setWelcomeMsg(val); setTone('custom'); }}
-                                                        autoComplete="off"
-                                                        multiline={2}
-                                                    />
-                                                    <TextField
-                                                        label={t('customization.counter_msg')}
-                                                        value={rejectMsg}
-                                                        onChange={(val) => { setRejectMsg(val); setTone('custom'); }}
-                                                        autoComplete="off"
-                                                        multiline={2}
-                                                    />
-                                                    <TextField
-                                                        label={t('customization.success_msg')}
-                                                        value={successMsg}
-                                                        onChange={(val) => { setSuccessMsg(val); setTone('custom'); }}
-                                                        autoComplete="off"
-                                                        multiline={2}
-                                                    />
                                                 </Box>
                                             </FormLayout>
                                         </div>
 
+                                        {/* Right Column: Preview */}
+                                        <div style={{ flex: "1 1 300px", minWidth: "300px" }}>
+                                            <div style={{ position: "sticky", top: "20px" }}>
+                                                <Box paddingBlockEnd="400" background="bg-surface-secondary" padding="400" borderRadius="200">
+                                                    <Text variant="headingSm" as="h6" paddingBlockEnd="400" alignment="center">Live Preview</Text>
+                                                    <div style={{ display: "flex", justifyContent: "center" }}>
+                                                        <div style={{
+                                                            border: "1px solid #e1e3e5",
+                                                            borderRadius: "12px",
+                                                            overflow: "hidden",
+                                                            width: "100%",
+                                                            maxWidth: "320px",
+                                                            backgroundColor: "#fff",
+                                                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                                                            fontFamily: '-apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif'
+                                                        }}>
+                                                            {/* Header */}
+                                                            <div style={{
+                                                                backgroundColor: color,
+                                                                color: "#fff",
+                                                                padding: "12px 16px",
+                                                                fontWeight: "600",
+                                                                display: "flex",
+                                                                justifyContent: "space-between",
+                                                                alignItems: "center"
+                                                            }}>
+                                                                <span>Chat with us</span>
+                                                                <span>✕</span>
+                                                            </div>
+                                                            {/* Body */}
+                                                            <div style={{
+                                                                padding: "16px",
+                                                                display: "flex",
+                                                                flexDirection: "column",
+                                                                gap: "12px",
+                                                                minHeight: "250px"
+                                                            }}>
+                                                                {/* Bot Msg */}
+                                                                <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
+                                                                    {botIcon ? (
+                                                                        <div style={{
+                                                                            width: "28px",
+                                                                            height: "28px",
+                                                                            borderRadius: "50%",
+                                                                            overflow: "hidden",
+                                                                            flexShrink: 0,
+                                                                            backgroundImage: `url(${botIcon})`,
+                                                                            backgroundSize: "cover",
+                                                                            backgroundPosition: "center"
+                                                                        }} />
+                                                                    ) : (
+                                                                        <div style={{ width: "28px", height: "28px", borderRadius: "50%", backgroundColor: "#eee", flexShrink: 0 }} />
+                                                                    )}
+                                                                    <div style={{
+                                                                        alignSelf: "flex-start",
+                                                                        backgroundColor: "#f1f1f1",
+                                                                        color: "#000",
+                                                                        padding: "10px 14px",
+                                                                        borderRadius: "18px 18px 18px 4px",
+                                                                        maxWidth: "85%",
+                                                                        fontSize: "14px",
+                                                                        lineHeight: "1.4"
+                                                                    }}>
+                                                                        {welcomeMsg || "Bonjour ! 👋"}
+                                                                    </div>
+                                                                </div>
+                                                                {/* User Msg */}
+                                                                <div style={{
+                                                                    alignSelf: "flex-end",
+                                                                    backgroundColor: color,
+                                                                    color: "#fff",
+                                                                    padding: "10px 14px",
+                                                                    borderRadius: "18px 18px 4px 18px",
+                                                                    maxWidth: "85%",
+                                                                    fontSize: "14px"
+                                                                }}>
+                                                                    I love this color!
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </Box>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </BlockStack>
+                            )}
+
+                            {/* TAB 1: CONVERSATION (Merged Mode) */}
+                            {selectedTab === 1 && (
+                                <BlockStack gap="500">
+                                    <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginBottom: "2rem" }}>
+                                        {/* Left Column: Settings */}
+                                        <div style={{ flex: "1 1 400px" }}>
+                                            <Text as="h2" variant="headingMd" tone="subdued" textDecorationLine="none">Conversation Strategy</Text>
+                                            <Box paddingBlockStart="400" paddingBlockEnd="400">
+                                                <Select
+                                                    label={t('customization.tone_label')}
+                                                    options={[
+                                                        { label: t('customization.tones.custom'), value: 'custom' },
+                                                        { label: t('customization.tones.standard'), value: 'standard' },
+                                                        { label: t('customization.tones.friendly'), value: 'friendly' },
+                                                        { label: t('customization.tones.professional'), value: 'professional' },
+                                                        { label: t('customization.tones.minimalist'), value: 'minimalist' },
+                                                    ]}
+                                                    onChange={handleToneChange}
+                                                    value={tone}
+                                                />
+                                                <Text as="p" tone="subdued">Select a tone to auto-fill all messages below.</Text>
+                                            </Box>
+
+                                            <Box paddingBlockEnd="400" borderColor="border-subdued" borderBlockEndWidth="025">
+                                                <Text variant="headingSm" as="h5">👋 Welcome Message</Text>
+                                                <TextField
+                                                    label="Initial greeting"
+                                                    value={welcomeMsg}
+                                                    onChange={(val) => { setWelcomeMsg(val); setTone('custom'); }}
+                                                    autoComplete="off"
+                                                    multiline={2}
+                                                />
+                                            </Box>
+
+                                            {/* The Dynamic Dictionary */}
+                                            <div style={{ marginTop: '20px' }}>
+                                                {renderReactionList('SHOCKED', "😱 Shocked (Offer too low)")}
+                                                {renderReactionList('LOW', "😕 Low (Offer needs improvement)")}
+                                                {renderReactionList('CLOSE', "🤔 Close (Almost there)")}
+                                                {renderReactionList('SUCCESS', "🎉 Success (Deal accepted)")}
+                                                {renderReactionList('HIGH', "🛑 High (Offer above original price)")}
+
+                                                <Text variant="headingMd" as="h3" paddingBlockStart="400" paddingBlockEnd="400">🛡️ System Messages (Fixed)</Text>
+
+                                                <Box paddingBlockEnd="400">
+                                                    <TextField
+                                                        label="Invalid Offer (Not a number)"
+                                                        value={reactionMessages?.negotiation?.reactions?.invalid_offer || ""}
+                                                        onChange={(val) => handleReactionChange('invalid_offer', val)}
+                                                        autoComplete="off"
+                                                    />
+                                                </Box>
+                                                <Box paddingBlockEnd="400">
+                                                    <TextField
+                                                        label="Discount Restriction (Item on sale)"
+                                                        value={reactionMessages?.negotiation?.reactions?.sale_restriction || ""}
+                                                        onChange={(val) => handleReactionChange('sale_restriction', val)}
+                                                        autoComplete="off"
+                                                    />
+                                                </Box>
+                                                <Box paddingBlockEnd="400">
+                                                    <TextField
+                                                        label="Min Limit Reached (Final Rejection)"
+                                                        value={reactionMessages?.negotiation?.reactions?.min_limit_reached || ""}
+                                                        onChange={(val) => handleReactionChange('min_limit_reached', val)}
+                                                        autoComplete="off"
+                                                    />
+                                                </Box>
+                                            </div>
+                                        </div>
+
                                         {/* Right Column: Chat Preview */}
                                         <div style={{ flex: "1 1 300px", minWidth: "300px" }}>
-                                            <Box paddingBlockEnd="400" background="bg-surface-secondary" padding="400" borderRadius="200">
-                                                <Text variant="headingSm" as="h6" paddingBlockEnd="400" alignment="center">{t('customization.chat_preview')}</Text>
-                                                <div style={{ display: "flex", justifyContent: "center" }}>
-                                                    <div style={{
-                                                        border: "1px solid #e1e3e5",
-                                                        borderRadius: "12px",
-                                                        overflow: "hidden",
-                                                        width: "100%",
-                                                        maxWidth: "320px",
-                                                        backgroundColor: "#fff",
-                                                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                                                        fontFamily: '-apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif'
-                                                    }}>
-                                                        {/* Header */}
+                                            <div style={{ position: "sticky", top: "20px" }}>
+                                                <Box paddingBlockEnd="400" background="bg-surface-secondary" padding="400" borderRadius="200">
+                                                    <Text variant="headingSm" as="h6" paddingBlockEnd="400" alignment="center">{t('customization.chat_preview')}</Text>
+                                                    <div style={{ display: "flex", justifyContent: "center" }}>
                                                         <div style={{
-                                                            backgroundColor: color,
-                                                            color: "#fff",
-                                                            padding: "12px 16px",
-                                                            fontWeight: "600",
-                                                            display: "flex",
-                                                            justifyContent: "space-between",
-                                                            alignItems: "center"
+                                                            border: "1px solid #e1e3e5",
+                                                            borderRadius: "12px",
+                                                            overflow: "hidden",
+                                                            width: "100%",
+                                                            maxWidth: "320px",
+                                                            backgroundColor: "#fff",
+                                                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                                                            fontFamily: '-apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif'
                                                         }}>
-                                                            <span>{t('customization.live_negotiation')}</span>
-                                                            <span>✕</span>
-                                                        </div>
-                                                        {/* Body */}
-                                                        <div style={{
-                                                            padding: "16px",
-                                                            display: "flex",
-                                                            flexDirection: "column",
-                                                            gap: "12px",
-                                                            minHeight: "250px"
-                                                        }}>
-                                                            {/* Bot Msg */}
-                                                            <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
-                                                                {botIcon ? (
+                                                            {/* Header */}
+                                                            <div style={{
+                                                                backgroundColor: color,
+                                                                color: "#fff",
+                                                                padding: "12px 16px",
+                                                                fontWeight: "600",
+                                                                display: "flex",
+                                                                justifyContent: "space-between",
+                                                                alignItems: "center"
+                                                            }}>
+                                                                <span>{t('customization.live_negotiation')}</span>
+                                                                <span>✕</span>
+                                                            </div>
+                                                            {/* Body */}
+                                                            <div style={{
+                                                                padding: "16px",
+                                                                display: "flex",
+                                                                flexDirection: "column",
+                                                                gap: "12px",
+                                                                minHeight: "250px"
+                                                            }}>
+                                                                {/* Bot Msg */}
+                                                                <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
+                                                                    {botIcon ? (
+                                                                        <div style={{
+                                                                            width: "28px",
+                                                                            height: "28px",
+                                                                            borderRadius: "50%",
+                                                                            overflow: "hidden",
+                                                                            flexShrink: 0,
+                                                                            backgroundImage: `url(${botIcon})`,
+                                                                            backgroundSize: "cover",
+                                                                            backgroundPosition: "center"
+                                                                        }} />
+                                                                    ) : (
+                                                                        <div style={{ width: "28px", height: "28px", borderRadius: "50%", backgroundColor: "#eee", flexShrink: 0 }} />
+                                                                    )}
                                                                     <div style={{
-                                                                        width: "28px",
-                                                                        height: "28px",
-                                                                        borderRadius: "50%",
-                                                                        overflow: "hidden",
-                                                                        flexShrink: 0,
-                                                                        backgroundImage: `url(${botIcon})`,
-                                                                        backgroundSize: "cover",
-                                                                        backgroundPosition: "center"
-                                                                    }} />
-                                                                ) : (
-                                                                    <div style={{ width: "28px", height: "28px", borderRadius: "50%", backgroundColor: "#eee", flexShrink: 0 }} />
-                                                                )}
+                                                                        alignSelf: "flex-start",
+                                                                        backgroundColor: "#f1f1f1",
+                                                                        color: "#000",
+                                                                        padding: "10px 14px",
+                                                                        borderRadius: "18px 18px 18px 4px",
+                                                                        maxWidth: "85%",
+                                                                        fontSize: "14px",
+                                                                        lineHeight: "1.4"
+                                                                    }}>
+                                                                        {welcomeMsg || "Bonjour ! 👋"}
+                                                                    </div>
+                                                                </div>
+                                                                {/* User Msg */}
+                                                                <div style={{
+                                                                    alignSelf: "flex-end",
+                                                                    backgroundColor: color,
+                                                                    color: "#fff",
+                                                                    padding: "10px 14px",
+                                                                    borderRadius: "18px 18px 4px 18px",
+                                                                    maxWidth: "85%",
+                                                                    fontSize: "14px"
+                                                                }}>
+                                                                    85 €
+                                                                </div>
+                                                                {/* Bot Logic */}
                                                                 <div style={{
                                                                     alignSelf: "flex-start",
                                                                     backgroundColor: "#f1f1f1",
@@ -514,44 +892,20 @@ export default function CustomizationPage() {
                                                                     fontSize: "14px",
                                                                     lineHeight: "1.4"
                                                                 }}>
-                                                                    {welcomeMsg || "Bonjour ! 👋"}
+                                                                    {reactionMessages?.negotiation?.reactions?.LOW?.[0]?.replace("{{price}}", "90.00") || rejectMsg?.replace("{price}", "90.00") || "Je peux faire 90.00 €."}
                                                                 </div>
-                                                            </div>
-                                                            {/* User Msg */}
-                                                            <div style={{
-                                                                alignSelf: "flex-end",
-                                                                backgroundColor: color,
-                                                                color: "#fff",
-                                                                padding: "10px 14px",
-                                                                borderRadius: "18px 18px 4px 18px",
-                                                                maxWidth: "85%",
-                                                                fontSize: "14px"
-                                                            }}>
-                                                                85 €
-                                                            </div>
-                                                            {/* Bot Logic */}
-                                                            <div style={{
-                                                                alignSelf: "flex-start",
-                                                                backgroundColor: "#f1f1f1",
-                                                                color: "#000",
-                                                                padding: "10px 14px",
-                                                                borderRadius: "18px 18px 18px 4px",
-                                                                maxWidth: "85%",
-                                                                fontSize: "14px",
-                                                                lineHeight: "1.4"
-                                                            }}>
-                                                                {rejectMsg ? rejectMsg.replace("{price}", "90.00") : "Je peux faire 90.00 €."}
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </Box>
+                                                </Box>
+                                            </div>
                                         </div>
                                     </div>
                                 </BlockStack>
                             )}
 
-                            {selectedTab === 1 && (
+                            {/* TAB 2: EMAILS */}
+                            {selectedTab === 2 && (
                                 <BlockStack gap="500">
                                     <Text as="h2" variant="headingMd">Email Templates</Text>
                                     <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
@@ -714,12 +1068,15 @@ export default function CustomizationPage() {
                                         </div>
                                     </div>
                                 </BlockStack>
+
                             )}
+
+
                         </Box>
                     </Card>
                 </Layout.Section>
             </Layout>
-        </Page>
+        </Page >
     );
 }
 
