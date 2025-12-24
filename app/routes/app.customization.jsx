@@ -45,6 +45,7 @@ export const loader = async ({ request }) => {
         botIcon: shop.botIcon,
         widgetColor: shop.widgetColor,
         botIcon: shop.botIcon,
+        widgetTemplate: shop.widgetTemplate || 'classic',
         emailFont: shop.emailFont,
         emailPrimaryColor: shop.emailPrimaryColor,
         emailAcceptedSubject: shop.emailAcceptedSubject,
@@ -72,7 +73,10 @@ export const action = async ({ request }) => {
         botSuccessMsg,
         widgetColor,
         widgetColor,
+        botSuccessMsg,
+        widgetColor,
         botIcon,
+        widgetTemplate: formData.get("widgetTemplate"),
         emailFont: formData.get("emailFont"),
         emailPrimaryColor: formData.get("emailPrimaryColor"),
         emailAcceptedSubject: formData.get("emailAcceptedSubject"),
@@ -247,6 +251,7 @@ export default function CustomizationPage() {
     const [successMsg, setSuccessMsg] = useState(initialSuccess);
     const [color, setColor] = useState(loaderData.widgetColor || "#000000");
     const [botIcon, setBotIcon] = useState(loaderData.botIcon || "");
+    const [widgetTemplate, setWidgetTemplate] = useState(loaderData.widgetTemplate || 'classic');
 
     // Email Customization State
     const [emailFont, setEmailFont] = useState(loaderData.emailFont || "Arial, sans-serif");
@@ -437,6 +442,7 @@ export default function CustomizationPage() {
             successMsg !== initialSuccess ||
             color !== (loaderData.widgetColor || "#000000") ||
             botIcon !== (loaderData.botIcon || "") ||
+            widgetTemplate !== (loaderData.widgetTemplate || 'classic') ||
             emailFont !== (loaderData.emailFont || "Arial, sans-serif") ||
             emailPrimaryColor !== (loaderData.emailPrimaryColor || "#008060") ||
             emailAcceptedSubject !== (loaderData.emailAcceptedSubject || "Your offer has been accepted! 🎉") ||
@@ -449,7 +455,7 @@ export default function CustomizationPage() {
 
         setIsDirty(isModified);
     }, [
-        welcomeMsg, rejectMsg, successMsg, color, botIcon, initialWelcome, initialReject, initialSuccess, loaderData,
+        welcomeMsg, rejectMsg, successMsg, color, botIcon, widgetTemplate, initialWelcome, initialReject, initialSuccess, loaderData,
         emailFont, emailPrimaryColor, emailAcceptedSubject, emailAcceptedBody, emailRejectedSubject, emailRejectedBody, emailCounterSubject, emailCounterBody,
         reactionMessages
     ]);
@@ -461,6 +467,7 @@ export default function CustomizationPage() {
         formData.append("botSuccessMsg", successMsg);
         formData.append("widgetColor", color);
         formData.append("botIcon", botIcon);
+        formData.append("widgetTemplate", widgetTemplate);
         formData.append("emailFont", emailFont);
         formData.append("emailPrimaryColor", emailPrimaryColor);
         formData.append("emailAcceptedSubject", emailAcceptedSubject);
@@ -560,6 +567,19 @@ export default function CustomizationPage() {
                                             <Text as="h2" variant="headingMd">{t('customization.widget_appearance')}</Text>
                                             <FormLayout>
                                                 <Box paddingBlockEnd="400">
+                                                    <Select
+                                                        label="Template / Style"
+                                                        options={[
+                                                            { label: 'Classic (Chat Bubble)', value: 'classic' },
+                                                            { label: 'Modern (Minimalist)', value: 'modern' },
+                                                            { label: 'Popup (Focus)', value: 'popup' }
+                                                        ]}
+                                                        onChange={setWidgetTemplate}
+                                                        value={widgetTemplate}
+                                                        helpText="Choose how the negotiation widget appears to your customers."
+                                                    />
+                                                </Box>
+                                                <Box paddingBlockEnd="400">
                                                     <Text variant="headingSm" as="h6">{t('customization.widget_color')}</Text>
                                                     <div style={{ display: "flex", alignItems: "end", gap: "10px", marginTop: "10px" }}>
                                                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px" }}>
@@ -620,7 +640,7 @@ export default function CustomizationPage() {
                                                             <div style={{
                                                                 width: "60px",
                                                                 height: "60px",
-                                                                backgroundColor: "#f1f2f4",
+                                                                backgroundColor: "#f1f1f1",
                                                                 borderRadius: "8px",
                                                                 display: "flex",
                                                                 alignItems: "center",

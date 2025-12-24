@@ -59,6 +59,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (header) header.style.backgroundColor = appSettings.widgetColor;
                 if (UI.submitBtn && data.widgetColor) UI.submitBtn.style.backgroundColor = data.widgetColor;
 
+                // Apply Widget Template
+                if (UI.modal) {
+                    const template = data.widgetTemplate || 'classic';
+                    UI.modal.classList.remove('template-classic', 'template-modern', 'template-popup');
+                    UI.modal.classList.add(`template-${template}`);
+                }
+
                 // Activation Logic
                 if (data.isEligible && data.isActive) {
                     UI.btn.style.display = "flex";
