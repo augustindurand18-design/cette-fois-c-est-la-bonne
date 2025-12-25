@@ -507,3 +507,138 @@
     animation: slideUpMobile 0.5s cubic-bezier(0.32, 0.72, 0, 1);
   }
 }
+
+/* --- Visual Chat Themes --- */
+
+/* 1. Modern (IOS 26 Glass / Glow) */
+.smart-offer-chat-container.theme-modern {
+  --so-bubble-radius: 24px;
+  --so-font-family: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Ultra-Transparent Glass */
+  background-color: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+
+  /* Glowing Borders */
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 15px 45px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+  /* Inner Light */
+}
+
+.theme-modern .smart-offer-header {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03) !important;
+}
+
+.theme-modern .smart-offer-message-bubble.bot {
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+}
+
+.theme-modern .smart-offer-message-bubble.user {
+  /* Vibrant Gradient with Glow */
+  background: linear-gradient(135deg, var(--widget-color, #007aff), #5ac8fa);
+  box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.theme-modern #smart-offer-input {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(5px);
+}
+
+/* 2. Playful (Snapchat-like) */
+.smart-offer-chat-container.theme-playful {
+  --so-bubble-radius: 12px;
+  --so-font-family: 'Avenir Next', 'Avenir', sans-serif;
+  border: 2px solid #000;
+  box-shadow: 4px 4px 0px rgba(0, 0, 0, 1) !important;
+}
+
+.theme-playful .smart-offer-header {
+  border-bottom: 2px solid #000;
+  font-weight: 800;
+}
+
+.theme-playful .smart-offer-message-bubble {
+  border: 2px solid transparent;
+  font-weight: 600;
+}
+
+.theme-playful .smart-offer-message-bubble.bot {
+  background-color: #fff !important;
+  border: 2px solid #e5e5ea;
+  color: #000;
+}
+
+.theme-playful .smart-offer-message-bubble.user {
+  box-shadow: none;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.theme-playful #smart-offer-input {
+  border: 2px solid #000;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.theme-playful #smart-offer-submit {
+  border: 2px solid #000;
+  background: #fffc00;
+  /* Snap yellow */
+  color: #000;
+  box-shadow: 2px 2px 0 #000;
+}
+
+.theme-playful #smart-offer-submit:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 #000;
+}
+
+
+/* 3. Classic (Facebook-like) */
+.smart-offer-chat-container.theme-classic {
+  --so-bubble-radius: 6px;
+  /* Squarer */
+  font-family: Helvetica, Arial, sans-serif;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.theme-classic .smart-offer-header {
+  background-color: #fff;
+  /* Clean white header usually, but we keep custom color support via JS overrides */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  border-bottom: none;
+}
+
+.theme-classic .smart-offer-message-bubble {
+  border-radius: 18px;
+  /* FB Messenger style - actually quite round but different shape logic */
+}
+
+.theme-classic .smart-offer-message-container.bot .smart-offer-message-bubble {
+  background-color: #e4e6eb !important;
+  /* FB Grey */
+  color: #050505;
+}
+
+.theme-classic .smart-offer-message-container.user .smart-offer-message-bubble {
+  /* User color takes from settings, but shape is consistent */
+}
+
+.theme-classic #smart-offer-input {
+  background-color: #f0f2f5;
+  border: none;
+  border-radius: 20px;
+}
+
+/* Override base radius with var */
+.smart-offer-message-bubble {
+  border-radius: var(--so-bubble-radius, 20px);
+}

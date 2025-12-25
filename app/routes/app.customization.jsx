@@ -34,6 +34,9 @@ export const loader = async ({ request }) => {
             botSuccessMsg: "",
             widgetColor: "#000000",
             botIcon: "",
+            widgetTemplate: "classic",
+            widgetTitle: "Chat with us",
+            chatTheme: "modern",
         };
     }
 
@@ -43,10 +46,9 @@ export const loader = async ({ request }) => {
         botSuccessMsg: shop.botSuccessMsg,
         widgetColor: shop.widgetColor,
         botIcon: shop.botIcon,
-        widgetColor: shop.widgetColor,
-        botIcon: shop.botIcon,
         widgetTemplate: shop.widgetTemplate || 'classic',
         widgetTitle: shop.widgetTitle || "Chat with us",
+        chatTheme: shop.chatTheme || "modern",
         emailFont: shop.emailFont,
         emailPrimaryColor: shop.emailPrimaryColor,
         emailAcceptedSubject: shop.emailAcceptedSubject,
@@ -73,12 +75,10 @@ export const action = async ({ request }) => {
         botRejectMsg,
         botSuccessMsg,
         widgetColor,
-        widgetColor,
-        botSuccessMsg,
-        widgetColor,
         botIcon,
         widgetTemplate: formData.get("widgetTemplate"),
         widgetTitle: formData.get("widgetTitle"),
+        chatTheme: formData.get("chatTheme"),
         emailFont: formData.get("emailFont"),
         emailPrimaryColor: formData.get("emailPrimaryColor"),
         emailAcceptedSubject: formData.get("emailAcceptedSubject"),
@@ -255,6 +255,7 @@ export default function CustomizationPage() {
     const [botIcon, setBotIcon] = useState(loaderData.botIcon || "");
     const [widgetTemplate, setWidgetTemplate] = useState(loaderData.widgetTemplate || 'classic');
     const [widgetTitle, setWidgetTitle] = useState(loaderData.widgetTitle || "Chat with us");
+    const [chatTheme, setChatTheme] = useState(loaderData.chatTheme || "modern");
 
     // Email Customization State
     const [emailFont, setEmailFont] = useState(loaderData.emailFont || "Arial, sans-serif");
@@ -446,6 +447,8 @@ export default function CustomizationPage() {
             color !== (loaderData.widgetColor || "#000000") ||
             botIcon !== (loaderData.botIcon || "") ||
             widgetTemplate !== (loaderData.widgetTemplate || 'classic') ||
+            widgetTitle !== (loaderData.widgetTitle || "Chat with us") ||
+            chatTheme !== (loaderData.chatTheme || "modern") ||
             emailFont !== (loaderData.emailFont || "Arial, sans-serif") ||
             emailPrimaryColor !== (loaderData.emailPrimaryColor || "#008060") ||
             emailAcceptedSubject !== (loaderData.emailAcceptedSubject || "Your offer has been accepted! 🎉") ||
@@ -458,7 +461,7 @@ export default function CustomizationPage() {
 
         setIsDirty(isModified);
     }, [
-        welcomeMsg, rejectMsg, successMsg, color, botIcon, widgetTemplate, widgetTitle, initialWelcome, initialReject, initialSuccess, loaderData,
+        welcomeMsg, rejectMsg, successMsg, color, botIcon, widgetTemplate, widgetTitle, chatTheme, initialWelcome, initialReject, initialSuccess, loaderData,
         emailFont, emailPrimaryColor, emailAcceptedSubject, emailAcceptedBody, emailRejectedSubject, emailRejectedBody, emailCounterSubject, emailCounterBody,
         reactionMessages
     ]);
@@ -472,6 +475,7 @@ export default function CustomizationPage() {
         formData.append("botIcon", botIcon);
         formData.append("widgetTemplate", widgetTemplate);
         formData.append("widgetTitle", widgetTitle);
+        formData.append("chatTheme", chatTheme);
         formData.append("emailFont", emailFont);
         formData.append("emailPrimaryColor", emailPrimaryColor);
         formData.append("emailAcceptedSubject", emailAcceptedSubject);
@@ -583,6 +587,19 @@ export default function CustomizationPage() {
                                                     />
                                                 </Box>
                                                 <Box paddingBlockEnd="400">
+                                                    <Select
+                                                        label="Style du Chat"
+                                                        options={[
+                                                            { label: 'Moderne', value: 'modern' },
+                                                            { label: 'Ludique', value: 'playful' },
+                                                            { label: 'Classique', value: 'classic' }
+                                                        ]}
+                                                        onChange={setChatTheme}
+                                                        value={chatTheme}
+                                                        helpText="Choisissez l'apparence des bulles et du chat."
+                                                    />
+                                                </Box>
+                                                <Box paddingBlockEnd="400">
                                                     <TextField
                                                         label="Titre du Widget"
                                                         value={widgetTitle}
@@ -691,11 +708,11 @@ export default function CustomizationPage() {
                                                             backgroundColor: "#fff",
                                                             boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                                                             fontFamily: '-apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif'
-                                                        }}>
+                                                        }} className={`smart-offer-preview-container theme-${chatTheme}`}>
                                                             {/* Header */}
-                                                            <div style={{
-                                                                backgroundColor: color,
-                                                                color: "#fff",
+                                                            <div className="preview-header" style={{
+                                                                backgroundColor: chatTheme === 'modern' ? 'transparent' : color,
+                                                                color: chatTheme === 'modern' ? '#000' : "#fff",
                                                                 padding: "12px 16px",
                                                                 fontWeight: "600",
                                                                 display: "flex",
@@ -1103,6 +1120,46 @@ export default function CustomizationPage() {
 
                             )}
 
+                            {/* CSS for Live Preview */}
+                            <style>{`
+                                /* Modern Theme (iOS 26 / Neon) */
+                                .smart-offer-preview-container.theme-modern {
+                                    --so-bubble-radius: 24px;
+                                    background-color: rgba(255, 255, 255, 0.65) !important;
+                                    backdrop-filter: blur(35px) saturate(200%);
+                                    -webkit-backdrop-filter: blur(35px) saturate(200%);
+                                    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+                                    box-shadow: 
+                                        0 20px 50px rgba(0, 0, 0, 0.1), 
+                                        0 0 0 1px rgba(255, 255, 255, 0.5) inset,
+                                        0 0 20px rgba(0, 122, 255, 0.15) !important; /* Blue Neon Aura */
+                                }
+                                .theme-modern .preview-header {
+                                    background: transparent !important;
+                                    border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+                                }
+                                
+                                /* Playful Theme */
+                                .smart-offer-preview-container.theme-playful {
+                                    border: 2px solid #000 !important;
+                                    box-shadow: 4px 4px 0px rgba(0,0,0,1) !important;
+                                    border-radius: 12px !important;
+                                }
+                                .theme-playful .preview-header {
+                                    border-bottom: 2px solid #000 !important;
+                                    font-weight: 800;
+                                }
+
+                                /* Classic Theme */
+                                .smart-offer-preview-container.theme-classic {
+                                    border-radius: 8px !important;
+                                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+                                }
+                                .theme-classic .preview-header {
+                                    border-bottom: none !important;
+                                    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                                }
+                            `}</style>
 
                         </Box>
                     </Card>

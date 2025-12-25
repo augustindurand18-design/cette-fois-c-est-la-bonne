@@ -58,7 +58,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 // Apply Styles
                 const header = document.querySelector(".smart-offer-header");
-                if (header) header.style.backgroundColor = appSettings.widgetColor;
+                // Only apply custom color if theme is NOT modern (modern uses glassmorphism)
+                if (header && data.chatTheme !== 'modern') {
+                    header.style.backgroundColor = appSettings.widgetColor;
+                } else if (header && data.chatTheme === 'modern') {
+                    // Ensure it's clear for modern
+                    header.style.removeProperty('background-color');
+                }
 
                 const titleEl = document.querySelector(".smart-offer-title");
                 if (titleEl) titleEl.innerText = appSettings.widgetTitle;
@@ -68,11 +74,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Apply Widget Template
                 if (UI.modal) {
                     const template = data.widgetTemplate || 'centered';
+                    const theme = data.chatTheme || 'modern';
+
+                    // Template Classes (Positioning)
                     UI.modal.classList.remove('template-classic', 'template-modern', 'template-popup', 'template-centered', 'template-corner');
                     UI.modal.classList.add(`template-${template}`);
 
+                    // Theme Classes (Visuals) - Applied to Chat Container
+                    if (UI.chatContainer) {
+                        UI.chatContainer.classList.remove('theme-modern', 'theme-playful', 'theme-classic');
+                        UI.chatContainer.classList.add(`theme-${theme}`);
+                    }
+
                     // Sync State
-                    if (State.config) State.config.widgetTemplate = template;
+                    if (State.config) {
+                        State.config.widgetTemplate = template;
+                        State.config.chatTheme = theme;
+                    }
                 }
 
                 // Activation Logic

@@ -76,6 +76,7 @@ export async function loader({ request }) {
         enableInactivityTrigger: shop.enableInactivityTrigger,
         widgetTemplate: shop.widgetTemplate,
         widgetTitle: shop.widgetTitle,
+        chatTheme: shop.chatTheme,
         isEligible
     }), {
         headers: {
