@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let appSettings = {
         botWelcomeMsg: "Hello! 👋 I can offer you a discount if you propose a reasonable price. What is your price?",
         widgetColor: "#000000",
+        widgetTitle: "Chat with us",
         botIcon: null
     };
 
@@ -52,18 +53,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Update Settings
                 if (data.botWelcomeMsg) appSettings.botWelcomeMsg = data.botWelcomeMsg;
                 if (data.widgetColor) appSettings.widgetColor = data.widgetColor;
+                if (data.widgetTitle) appSettings.widgetTitle = data.widgetTitle;
                 if (data.botIcon) appSettings.botIcon = data.botIcon;
 
                 // Apply Styles
                 const header = document.querySelector(".smart-offer-header");
                 if (header) header.style.backgroundColor = appSettings.widgetColor;
+
+                const titleEl = document.querySelector(".smart-offer-title");
+                if (titleEl) titleEl.innerText = appSettings.widgetTitle;
+
                 if (UI.submitBtn && data.widgetColor) UI.submitBtn.style.backgroundColor = data.widgetColor;
 
                 // Apply Widget Template
                 if (UI.modal) {
-                    const template = data.widgetTemplate || 'classic';
-                    UI.modal.classList.remove('template-classic', 'template-modern', 'template-popup');
+                    const template = data.widgetTemplate || 'centered';
+                    UI.modal.classList.remove('template-classic', 'template-modern', 'template-popup', 'template-centered', 'template-corner');
                     UI.modal.classList.add(`template-${template}`);
+
+                    // Sync State
+                    if (State.config) State.config.widgetTemplate = template;
                 }
 
                 // Activation Logic
@@ -400,23 +409,44 @@ document.addEventListener('DOMContentLoaded', function () {
         UI.chatContainer.classList.add('smart-offer-shake');
     };
 
-    // 4. Modal Management
+    // 4. Modal Management & Rendering
     const openChat = async () => {
         UI.modal.style.display = "block";
         State.isOpen = true;
         document.body.style.overflow = "hidden"; // Mobile Scroll Lock
 
-        // Add Product Card & Welcome if empty
-        if (UI.messagesContainer.children.length === 0) {
-            renderProductCard();
-            setThinking(true);
-            await wait(600);
-            setThinking(false);
-            addMessage(appSettings.botWelcomeMsg, "bot");
+        // Initial Layout Render (Only if empty)
+        if (UI.messagesContainer && UI.messagesContainer.children.length === 0) {
+            const template = State.config.widgetTemplate || 'centered';
+
+            // Always render standard chat layout
+            await renderChatLayout();
+
+            // Apply positioning class logic
+            // Reset classes first
+            UI.modal.classList.remove('template-centered', 'template-corner', 'template-modern', 'template-classic', 'template-popup');
+
+            if (template === 'corner') {
+                UI.modal.classList.add('template-corner');
+            } else {
+                // Default to centered for any other value (fallback)
+                UI.modal.classList.add('template-centered');
+            }
         }
 
         handleVisualViewport();
     };
+
+    const renderChatLayout = async () => {
+        // Standard Chatbot Flow
+        renderProductCard();
+        setThinking(true);
+        await wait(600);
+        setThinking(false);
+        addMessage(appSettings.botWelcomeMsg, "bot");
+    };
+
+    // Removed Form Mode Logic (renderFormLayout, handleFormSubmission) as we are consolidating to Chat Interface only.
 
     const closeChat = () => {
         UI.modal.style.display = "none";

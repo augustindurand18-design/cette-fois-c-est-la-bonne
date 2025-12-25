@@ -73,7 +73,9 @@ export async function loader({ request }) {
         isActive: shop.isActive,
         enableExitIntent: shop.enableExitIntent,
         enableInactivityTrigger: shop.enableInactivityTrigger,
+        enableInactivityTrigger: shop.enableInactivityTrigger,
         widgetTemplate: shop.widgetTemplate,
+        widgetTitle: shop.widgetTitle,
         isEligible
     }), {
         headers: {

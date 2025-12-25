@@ -42,6 +42,7 @@ model Shop {
   botRejectMsg  String   @default("C'est un peu juste... Je peux vous le faire à {price} €.")
   botSuccessMsg String   @default("C'est d'accord pour {price}€ ! 🎉")
   widgetColor   String   @default("#000000")
+  widgetTitle   String   @default("Chat with us")
   botIcon       String?
   // Email Customization
   emailFont           String   @default("Arial, sans-serif")

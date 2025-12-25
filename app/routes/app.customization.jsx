@@ -46,6 +46,7 @@ export const loader = async ({ request }) => {
         widgetColor: shop.widgetColor,
         botIcon: shop.botIcon,
         widgetTemplate: shop.widgetTemplate || 'classic',
+        widgetTitle: shop.widgetTitle || "Chat with us",
         emailFont: shop.emailFont,
         emailPrimaryColor: shop.emailPrimaryColor,
         emailAcceptedSubject: shop.emailAcceptedSubject,
@@ -77,6 +78,7 @@ export const action = async ({ request }) => {
         widgetColor,
         botIcon,
         widgetTemplate: formData.get("widgetTemplate"),
+        widgetTitle: formData.get("widgetTitle"),
         emailFont: formData.get("emailFont"),
         emailPrimaryColor: formData.get("emailPrimaryColor"),
         emailAcceptedSubject: formData.get("emailAcceptedSubject"),
@@ -252,6 +254,7 @@ export default function CustomizationPage() {
     const [color, setColor] = useState(loaderData.widgetColor || "#000000");
     const [botIcon, setBotIcon] = useState(loaderData.botIcon || "");
     const [widgetTemplate, setWidgetTemplate] = useState(loaderData.widgetTemplate || 'classic');
+    const [widgetTitle, setWidgetTitle] = useState(loaderData.widgetTitle || "Chat with us");
 
     // Email Customization State
     const [emailFont, setEmailFont] = useState(loaderData.emailFont || "Arial, sans-serif");
@@ -455,7 +458,7 @@ export default function CustomizationPage() {
 
         setIsDirty(isModified);
     }, [
-        welcomeMsg, rejectMsg, successMsg, color, botIcon, widgetTemplate, initialWelcome, initialReject, initialSuccess, loaderData,
+        welcomeMsg, rejectMsg, successMsg, color, botIcon, widgetTemplate, widgetTitle, initialWelcome, initialReject, initialSuccess, loaderData,
         emailFont, emailPrimaryColor, emailAcceptedSubject, emailAcceptedBody, emailRejectedSubject, emailRejectedBody, emailCounterSubject, emailCounterBody,
         reactionMessages
     ]);
@@ -468,6 +471,7 @@ export default function CustomizationPage() {
         formData.append("widgetColor", color);
         formData.append("botIcon", botIcon);
         formData.append("widgetTemplate", widgetTemplate);
+        formData.append("widgetTitle", widgetTitle);
         formData.append("emailFont", emailFont);
         formData.append("emailPrimaryColor", emailPrimaryColor);
         formData.append("emailAcceptedSubject", emailAcceptedSubject);
@@ -568,15 +572,23 @@ export default function CustomizationPage() {
                                             <FormLayout>
                                                 <Box paddingBlockEnd="400">
                                                     <Select
-                                                        label="Template / Style"
+                                                        label="Position & Style"
                                                         options={[
-                                                            { label: 'Classic (Chat Bubble)', value: 'classic' },
-                                                            { label: 'Modern (Minimalist)', value: 'modern' },
-                                                            { label: 'Popup (Focus)', value: 'popup' }
+                                                            { label: 'Centre (Popup Classique)', value: 'centered' },
+                                                            { label: 'Angle (Glissant - Bas Droite)', value: 'corner' }
                                                         ]}
                                                         onChange={setWidgetTemplate}
                                                         value={widgetTemplate}
-                                                        helpText="Choose how the negotiation widget appears to your customers."
+                                                        helpText="Choisissez la position du widget sur la boutique."
+                                                    />
+                                                </Box>
+                                                <Box paddingBlockEnd="400">
+                                                    <TextField
+                                                        label="Titre du Widget"
+                                                        value={widgetTitle}
+                                                        onChange={setWidgetTitle}
+                                                        autoComplete="off"
+                                                        helpText="Texte affiché en haut de la fenêtre (ex: Discuter avec nous)"
                                                     />
                                                 </Box>
                                                 <Box paddingBlockEnd="400">
@@ -690,7 +702,7 @@ export default function CustomizationPage() {
                                                                 justifyContent: "space-between",
                                                                 alignItems: "center"
                                                             }}>
-                                                                <span>Chat with us</span>
+                                                                <span>{widgetTitle || "Chat with us"}</span>
                                                                 <span>✕</span>
                                                             </div>
                                                             {/* Body */}
