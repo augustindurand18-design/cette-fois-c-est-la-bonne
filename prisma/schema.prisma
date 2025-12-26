@@ -36,7 +36,7 @@ model Shop {
   autoNegotiation Boolean @default(true)
   maxRounds     Int      @default(3)
   strategy      String   @default("moderate") // 'aggressive', 'moderate', 'conciliatory'
-  allowSaleItems Boolean @default(true)
+  allowSaleItems Boolean @default(false)
   priceRounding Float    @default(0.85)
   botWelcomeMsg String   @default("Bonjour ! 👋 Je peux vous faire une remise si vous me proposez un prix raisonnable. Quel est votre prix ?")
   botRejectMsg  String   @default("C'est un peu juste... Je peux vous le faire à {price} €.")
@@ -55,8 +55,8 @@ model Shop {
   emailCounterSubject  String  @default("Counter-offer for your request")
   emailCounterBody     String  @default("<h2>New proposal for {productTitle}</h2><p>Your initial offer was a bit low, but we want to find a deal.</p><p>We can offer you this product for the exceptional price of:</p><h1 style='color: blue;'>{newPrice} €</h1><p><strong>Accept this offer:</strong> Use code <strong style='color: green;'>{code}</strong> at checkout.</p><p>(Valid until {endsAt})</p>")
 
-  enableExitIntent    Boolean @default(false)
-  enableInactivityTrigger Boolean @default(false)
+  enableExitIntent    Boolean @default(true)
+  enableInactivityTrigger Boolean @default(true)
   fulfillmentMode String   @default("DISCOUNT_CODE") // 'DISCOUNT_CODE' or 'DRAFT_ORDER'
   widgetTemplate String    @default("classic") // 'classic', 'modern', 'popup'
   rules         Rule[]

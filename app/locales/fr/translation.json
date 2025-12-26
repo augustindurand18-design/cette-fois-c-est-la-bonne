@@ -81,6 +81,19 @@
         "counter_msg": "Message de Contre-offre",
         "success_msg": "Message de Succès",
         "msg_help": "Si vous ne mettez pas le prix, il sera ajouté automatiquement à la fin.",
+        "position_style": "Position & Style",
+        "position_help": "Choisissez la position du widget sur la boutique.",
+        "chat_style": "Style du Chat",
+        "theme_help": "Choisissez l'apparence des bulles et du chat.",
+        "templates": {
+            "centered": "Centre (Popup Classique)",
+            "corner": "Angle (Glissant - Bas Droite)"
+        },
+        "themes": {
+            "modern": "Moderne",
+            "playful": "Ludique",
+            "classic": "Classique"
+        },
         "tones": {
             "custom": "Personnalisé",
             "standard": "Standard",

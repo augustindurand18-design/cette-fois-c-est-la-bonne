@@ -351,7 +351,7 @@ export default function CustomizationPage() {
                 return key;
             }
         }
-        return "custom";
+        return "standard";
     });
 
 
@@ -576,27 +576,27 @@ export default function CustomizationPage() {
                                             <FormLayout>
                                                 <Box paddingBlockEnd="400">
                                                     <Select
-                                                        label="Position & Style"
+                                                        label={t('customization.position_style')}
                                                         options={[
-                                                            { label: 'Centre (Popup Classique)', value: 'centered' },
-                                                            { label: 'Angle (Glissant - Bas Droite)', value: 'corner' }
+                                                            { label: t('customization.templates.centered'), value: 'centered' },
+                                                            { label: t('customization.templates.corner'), value: 'corner' }
                                                         ]}
                                                         onChange={setWidgetTemplate}
                                                         value={widgetTemplate}
-                                                        helpText="Choisissez la position du widget sur la boutique."
+                                                        helpText={t('customization.position_help')}
                                                     />
                                                 </Box>
                                                 <Box paddingBlockEnd="400">
                                                     <Select
-                                                        label="Style du Chat"
+                                                        label={t('customization.chat_style')}
                                                         options={[
-                                                            { label: 'Moderne', value: 'modern' },
-                                                            { label: 'Ludique', value: 'playful' },
-                                                            { label: 'Classique', value: 'classic' }
+                                                            { label: t('customization.themes.modern'), value: 'modern' },
+                                                            { label: t('customization.themes.playful'), value: 'playful' },
+                                                            { label: t('customization.themes.classic'), value: 'classic' }
                                                         ]}
                                                         onChange={setChatTheme}
                                                         value={chatTheme}
-                                                        helpText="Choisissez l'apparence des bulles et du chat."
+                                                        helpText={t('customization.theme_help')}
                                                     />
                                                 </Box>
                                                 <Box paddingBlockEnd="400">

@@ -144,6 +144,19 @@
         "counter_msg": "Counter-offer Message",
         "success_msg": "Success Message",
         "msg_help": "If you don't include the price, it will be automatically added at the end.",
+        "position_style": "Position & Style",
+        "position_help": "Choose the widget position on the store.",
+        "chat_style": "Chat Style",
+        "theme_help": "Choose the appearance of bubbles and chat.",
+        "templates": {
+            "centered": "Center (Classic Popup)",
+            "corner": "Corner (Slide - Bottom Right)"
+        },
+        "themes": {
+            "modern": "Modern",
+            "playful": "Playful",
+            "classic": "Classic"
+        },
         "tones": {
             "custom": "Custom",
             "standard": "Standard",

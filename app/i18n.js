@@ -8,7 +8,7 @@ i18n
     .use(LanguageDetector)
     .use(initReactI18next)
     .init({
-        // lng: "en", // Removed to enable detection
+        lng: typeof window === "undefined" ? "en" : undefined, // Force EN on server, detect on client
         fallbackLng: "en",
         supportedLngs: ["en", "fr"],
         resources: {
@@ -23,7 +23,8 @@ i18n
         },
         detection: {
             // Priority to forced language, but keeping detection config for future flexibility
-            order: ["localStorage", "navigator"],
+            order: ["querystring", "localStorage", "navigator"],
+            lookupQuerystring: "locale",
             caches: ["localStorage"],
         },
     });

@@ -11,7 +11,7 @@ export const links = () => [
 export default function App() {
   return (
     <I18nextProvider i18n={i18n}>
-      <html lang={i18n.language || "fr"}>
+      <html lang={i18n.language || "en"}>
         <head>
           <meta charSet="utf-8" />
           <meta name="viewport" content="width=device-width,initial-scale=1" />

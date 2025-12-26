@@ -23,7 +23,11 @@ export const loader = async ({ request }) => {
         shopUrl: session.shop,
         accessToken: session.accessToken,
         isActive: true,
-        id: crypto.randomUUID()
+        id: crypto.randomUUID(),
+        // Defaults per user request
+        allowSaleItems: false,
+        enableExitIntent: true,
+        enableInactivityTrigger: true
       }
     });
   } catch (e) {
