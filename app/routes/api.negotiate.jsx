@@ -73,7 +73,6 @@ export async function loader({ request }) {
         isActive: shop.isActive,
         enableExitIntent: shop.enableExitIntent,
         enableInactivityTrigger: shop.enableInactivityTrigger,
-        enableInactivityTrigger: shop.enableInactivityTrigger,
         widgetTemplate: shop.widgetTemplate,
         widgetTitle: shop.widgetTitle,
         chatTheme: shop.chatTheme,
@@ -121,6 +120,9 @@ export async function action({ request }) {
         // 1. Verify Shop & Get Token
         const shop = await db.shop.findUnique({ where: { shopUrl } });
         if (!shop || !shop.isActive) {
+            // SECURITY: If strict mode is enabled, we could also check admin.billing here
+            // const { admin } = await authenticate.public.appProxy(request);
+            // if (admin) { const hasPayment = await admin.billing.check(...); if (!hasPayment) ... }
             return new Response(JSON.stringify({ error: "Shop negotiation is disabled." }), { status: 403 });
         }
 

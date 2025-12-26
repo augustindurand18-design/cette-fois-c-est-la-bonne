@@ -112,4 +112,5 @@ model Offer {
 
   @@index([sessionId])
   @@index([code])
+  @@index([shopId])
 }

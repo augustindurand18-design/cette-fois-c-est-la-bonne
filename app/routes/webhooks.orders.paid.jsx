@@ -72,7 +72,10 @@ export const action = async ({ request }) => {
                     // The offer was for a specific product price. The order might have multiple items.
                     // Ideally we charge on the `offer.offeredPrice`.
 
-                    const commissionAmount = offer.offeredPrice * commissionRate;
+                    // Secure Math: Work in cents to avoid floating point errors
+                    const priceInCents = Math.round(offer.offeredPrice * 100);
+                    const commissionInCents = Math.round(priceInCents * commissionRate);
+                    const commissionAmount = commissionInCents / 100;
 
                     console.log(`Charging commission: ${commissionAmount} (Rate: ${commissionRate}) for Offer Price: ${offer.offeredPrice}`);
 
@@ -114,7 +117,7 @@ export const action = async ({ request }) => {
 
                         if (lineItem) {
                             try {
-                                const roundedCommission = Math.round(commissionAmount * 100) / 100;
+                                const roundedCommission = parseFloat(commissionAmount.toFixed(2));
                                 await billing.createUsageRecord({
                                     subscriptionLineItemId: lineItem.id,
                                     price: { amount: roundedCommission, currencyCode: 'USD' },
