@@ -1,5 +1,6 @@
 import { Outlet, useLoaderData, useRouteError } from "react-router";
 import { useEffect } from "react";
+import crypto from "crypto";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
@@ -7,8 +8,27 @@ import { authenticate, PLAN_STARTER, PLAN_GROWTH, PLAN_SCALE } from "../shopify.
 
 export const links = () => [];
 
+import db from "../db.server";
+
 export const loader = async ({ request }) => {
-  const { billing } = await authenticate.admin(request);
+  const { billing, session } = await authenticate.admin(request);
+
+  // SELF-HEALING: Sync Access Token from Session to DB
+  // This ensures that even after a DB reset, the token is restored when Admin is opened.
+  try {
+    await db.shop.upsert({
+      where: { shopUrl: session.shop },
+      update: { accessToken: session.accessToken },
+      create: {
+        shopUrl: session.shop,
+        accessToken: session.accessToken,
+        isActive: true,
+        id: crypto.randomUUID()
+      }
+    });
+  } catch (e) {
+    console.error("Failed to sync token in App Loader", e);
+  }
 
   // Check Billing
   if (process.env.NODE_ENV === 'production') {

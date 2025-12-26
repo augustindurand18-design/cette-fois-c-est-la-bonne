@@ -159,6 +159,7 @@ export async function action({ request }) {
             }
 
             // 3. Ultimate Fallback (Hardcoded English if i18n fails or key missing)
+            // 3. Ultimate Fallback (Hardcoded English if i18n fails or key missing)
             const enTranslations = {
                 negotiation: {
                     reactions: {
@@ -266,27 +267,13 @@ export async function action({ request }) {
         // SMART PARSING
         let offerValue = null;
         let chatResponse = null;
+        // 2024 UPDATE: Force Deterministic Mode (No AI)
+        // We solely rely on Regex to extract price. 
+        // We do NOT use AI for chat to ensuring strict adherence to Customization settings.
+        /* 
         const apiKey = process.env.GEMINI_API_KEY;
-
-        if (apiKey) {
-            const minPriceForContext = minAcceptedPrice || (originalPrice * 0.8);
-            const aiResult = await AIService.analyzeIntent(apiKey, {
-                productTitle: productData.title,
-                originalPrice,
-                minPriceForContext,
-                userText: offerPrice
-            });
-
-            if (aiResult) {
-                if (aiResult.type === 'OFFER' && aiResult.price) {
-                    offerValue = aiResult.price;
-                } else if (aiResult.type === 'CHAT') {
-                    chatResponse = aiResult.message;
-                }
-            }
-        } else {
-            console.warn("Negotiate API: Missing GEMINI_API_KEY");
-        }
+        if (apiKey) { ... } 
+        */
 
         // Fallback or explicit regex
         if (offerValue === null && chatResponse === null) {

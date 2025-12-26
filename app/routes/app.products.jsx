@@ -29,7 +29,7 @@ export const loader = async ({ request }) => {
     const { session, admin } = await authenticate.admin(request);
     const shopUrl = session.shop;
 
-    const shop = await db.shop.findUnique({
+    let shop = await db.shop.findUnique({
         where: { shopUrl },
         include: { rules: true },
     });
@@ -38,12 +38,28 @@ export const loader = async ({ request }) => {
     console.log("[LOADER] Shop found:", !!shop);
 
     if (!shop) {
-        console.log("[LOADER] Shop not found, returning empty rules.");
-        return { rules: [] };
+        console.log("[LOADER] Shop not found, self-healing...");
+        try {
+            shop = await db.shop.create({
+                data: {
+                    id: crypto.randomUUID(),
+                    shopUrl,
+                    isActive: true, // Default to active
+                }
+            });
+            // Re-fetch to be safe or just use it
+            shop = await db.shop.findUnique({
+                where: { shopUrl },
+                include: { rules: true },
+            });
+        } catch (e) {
+            console.error("[LOADER] Failed to create shop", e);
+            throw e;
+        }
     }
 
     // Filter out the global rule to send only specific rules to the list
-    const specificRules = shop.rules.filter((r) => r.collectionId || r.productId);
+    const specificRules = (shop.rules || []).filter((r) => r.collectionId || r.productId);
 
     // Fetch details from Shopify
     const productIds = specificRules.filter(r => r.productId).map(r => r.productId);
@@ -406,32 +422,52 @@ export default function ProductsPage() {
     };
 
     const handleAddProduct = async () => {
-        const selection = await window.shopify.resourcePicker({
-            type: "product",
-            multiple: false,
-        });
+        console.log("Add Product Clicked. Window.shopify:", window.shopify);
+        if (!window.shopify) {
+            setToastMessage("Erreur: Shopify App Bridge non chargé. Rafraîchissez la page.");
+            setToastError(true);
+            setToastActive(true);
+            return;
+        }
 
-        if (selection && selection.length > 0) {
-            fetcher.submit({
-                actionType: "addRule",
-                resourceId: selection[0].id,
-                type: "product"
-            }, { method: "POST" });
+        try {
+            const selection = await window.shopify.resourcePicker({
+                type: "product",
+                multiple: false,
+            });
+
+            if (selection && selection.length > 0) {
+                fetcher.submit({
+                    actionType: "addRule",
+                    resourceId: selection[0].id,
+                    type: "product"
+                }, { method: "POST" });
+            }
+        } catch (e) {
+            console.error("Resource Picker Error:", e);
+            setToastMessage("Echec selecteur: " + e.message);
+            setToastError(true);
+            setToastActive(true);
         }
     };
 
     const handleAddCollection = async () => {
-        const selection = await window.shopify.resourcePicker({
-            type: "collection",
-            multiple: false,
-        });
+        if (!window.shopify) return;
+        try {
+            const selection = await window.shopify.resourcePicker({
+                type: "collection",
+                multiple: false,
+            });
 
-        if (selection && selection.length > 0) {
-            fetcher.submit({
-                actionType: "addRule",
-                resourceId: selection[0].id,
-                type: "collection"
-            }, { method: "POST" });
+            if (selection && selection.length > 0) {
+                fetcher.submit({
+                    actionType: "addRule",
+                    resourceId: selection[0].id,
+                    type: "collection"
+                }, { method: "POST" });
+            }
+        } catch (e) {
+            console.error("Collection Picker Error:", e);
         }
     };
 
