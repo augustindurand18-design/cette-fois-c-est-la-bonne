@@ -77,6 +77,7 @@ export async function loader({ request }) {
         widgetTemplate: shop.widgetTemplate,
         widgetTitle: shop.widgetTitle,
         chatTheme: shop.chatTheme,
+        showWatermark: shop.plan !== 'Scale (Flat)',
         isEligible
     }), {
         headers: {

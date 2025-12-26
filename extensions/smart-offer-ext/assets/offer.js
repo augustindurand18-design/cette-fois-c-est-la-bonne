@@ -66,6 +66,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     header.style.removeProperty('background-color');
                 }
 
+                // Branding / Watermark Logic
+                const brandingEl = document.querySelector(".smart-offer-branding");
+                if (brandingEl) {
+                    if (data.showWatermark === false) {
+                        brandingEl.style.display = 'none';
+                    } else {
+                        brandingEl.style.display = 'block'; // Ensure visible otherwise
+                    }
+                }
+
                 const titleEl = document.querySelector(".smart-offer-title");
                 if (titleEl) titleEl.innerText = appSettings.widgetTitle;
 

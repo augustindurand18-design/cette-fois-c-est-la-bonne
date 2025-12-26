@@ -1,6 +1,6 @@
 import { useLoaderData, useSubmit } from "react-router";
 import { Page, Layout, Card, Text, Button, BlockStack, Box, InlineGrid, List, Badge, Divider, Icon, InlineStack } from "@shopify/polaris";
-import { CheckIcon } from "@shopify/polaris-icons";
+import { CheckIcon, XIcon } from "@shopify/polaris-icons";
 import { authenticate, PLAN_STARTER, PLAN_GROWTH, PLAN_SCALE } from "../shopify.server";
 
 export async function loader({ request }) {
@@ -64,7 +64,7 @@ export default function Pricing() {
         submit({ plan }, { method: "POST" });
     };
 
-    const PlanCard = ({ title, price, features, isCurrent, targetPlan, recommendation }) => (
+    const PlanCard = ({ title, price, features, limitations, isCurrent, targetPlan, recommendation }) => (
         <Card>
             <BlockStack gap="500">
                 <BlockStack gap="200">
@@ -90,6 +90,16 @@ export default function Pricing() {
                             </Box>
                             <Text variant="bodyLg" as="span" fontWeight={feature.includes('%') ? 'bold' : 'regular'}>
                                 {feature}
+                            </Text>
+                        </InlineStack>
+                    ))}
+                    {limitations && limitations.map((limitation, index) => (
+                        <InlineStack key={`limit-${index}`} gap="300" blockAlign="center" wrap={false}>
+                            <Box minWidth="24px">
+                                <Icon source={XIcon} tone="critical" />
+                            </Box>
+                            <Text variant="bodyLg" as="span" tone="subdued">
+                                {limitation}
                             </Text>
                         </InlineStack>
                     ))}
@@ -123,6 +133,9 @@ export default function Pricing() {
                                 "Unlimited Volume",
                                 "Priority Support"
                             ]}
+                            limitations={[
+                                "Remove Watermark"
+                            ]}
                             isCurrent={currentPlan === "Starter"}
                             targetPlan="Starter"
                         />
@@ -136,6 +149,9 @@ export default function Pricing() {
                                 "Unlimited Volume",
                                 "Priority Support"
                             ]}
+                            limitations={[
+                                "Remove Watermark"
+                            ]}
                             isCurrent={currentPlan === "Growth"}
                             targetPlan="Growth"
                         />
@@ -147,7 +163,8 @@ export default function Pricing() {
                                 "Full Features Access",
                                 "0% Commission",
                                 "Unlimited Volume",
-                                "Priority Support"
+                                "Priority Support",
+                                "Remove Watermark"
                             ]}
                             isCurrent={currentPlan === "Scale"}
                             targetPlan="Scale"
