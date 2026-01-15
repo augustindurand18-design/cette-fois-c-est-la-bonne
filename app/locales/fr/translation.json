@@ -54,7 +54,29 @@
         "manual_validity": "Validité Manuelle (Email)",
         "auto_validity_help": "Expiration des codes générés par chatbot.",
         "manual_validity_help": "Expiration des codes envoyés manuellement.",
-        "strategy_default": "Défaut : Modéré"
+        "strategy_default": "Défaut : Modéré",
+        "fulfillment_title": "Finalisation & Sécurité (Contrôle Marchand)",
+        "fulfillment_standard": "Paiement Immédiat (Standard)",
+        "fulfillment_standard_help": "Le client paie immédiatement via un code promo.",
+        "fulfillment_draft": "Validation Manuelle (Recommandé > 1000€)",
+        "fulfillment_draft_help": "Aucun paiement immédiat. Une commande brouillon est créée pour votre validation finale.",
+        "inactivity_label": "Activer le déclencheur d'inactivité",
+        "inactivity_help": "Ouvre le chat automatiquement après 20 s d'inactivité.",
+        "strategies": {
+            "conciliatory": "Conciliant (Lâche prise rapidement)",
+            "moderate": "Modéré (Équilibré)",
+            "aggressive": "Ferme (Lâche prise difficilement)"
+        },
+        "rounding_options": {
+            "psychological": ".85 (Psychologique)",
+            "classic": ".99 (Classique)",
+            "round": ".00 (Rond)"
+        },
+        "rounds_options": {
+            "one": "1 (Offre unique)",
+            "three": "3 (Classique)",
+            "five": "5 (Longue négociation)"
+        }
     },
     "customization": {
         "title": "Personnalisation",

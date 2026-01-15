@@ -274,9 +274,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 break;
 
+            case 'ERROR':
+                addMessage(data.message || data.error || "An error occurred.", "bot");
+                break;
+
             case 'CHAT':
             default:
-                addMessage(data.message || "I didn't understand.", "bot");
+                // Fallback: check for error field if status is unknown
+                const fallbackMsg = data.message || data.error || "I didn't understand.";
+                addMessage(fallbackMsg, "bot");
                 break;
         }
     };
@@ -543,8 +549,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Mobile Focus Hack to scroll
-    UI.input.addEventListener('focus', () => setTimeout(scrollToBottom, 300));
+    // Mobile Focus Hack to scroll & Keyboard detection
+    UI.input.addEventListener('focus', () => {
+        UI.chatContainer.classList.add('keyboard-open');
+        setTimeout(scrollToBottom, 300);
+    });
+    UI.input.addEventListener('blur', () => {
+        // Delay removal slightly to allow clicks on UI elements (like submit) before layout shifts
+        setTimeout(() => {
+            UI.chatContainer.classList.remove('keyboard-open');
+        }, 100);
+    });
 
     // Utils
     const wait = (ms) => new Promise(r => setTimeout(r, ms));

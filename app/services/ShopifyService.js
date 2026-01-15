@@ -190,7 +190,7 @@ export const ShopifyService = {
             variantId: variantId.includes("gid://") ? variantId : `gid://shopify/ProductVariant/${variantId}`,
             quantity: 1,
             appliedDiscount: {
-              value: Math.abs(amount).toFixed(2),
+              value: parseFloat(Math.abs(amount).toFixed(2)),
               valueType: "FIXED_AMOUNT",
               title: "Remise Négociée"
             }
@@ -212,14 +212,18 @@ export const ShopifyService = {
       const json = await response.json();
 
       if (json.errors || json.data?.draftOrderCreate?.userErrors?.length > 0) {
-        console.error("ShopifyService: Draft Order Creation Error", json.errors || json.data.draftOrderCreate.userErrors);
-        return null;
+        const errorMessages = json.errors
+          ? json.errors.map(e => e.message).join(", ")
+          : json.data.draftOrderCreate.userErrors.map(e => e.message).join(", ");
+
+        console.error("ShopifyService: Draft Order Creation Error", errorMessages);
+        return { error: errorMessages };
       }
 
       return json.data?.draftOrderCreate?.draftOrder;
     } catch (e) {
       console.error("ShopifyService: Error creating draft order", e);
-      return null;
+      return { error: e.message };
     }
   },
 

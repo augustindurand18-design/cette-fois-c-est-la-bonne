@@ -277,9 +277,13 @@ export async function action({ request }) {
 
         // Fallback or explicit regex
         if (offerValue === null && chatResponse === null) {
+            console.log("Negotiate API: Attempting regex parse on", offerPrice);
             const priceMatch = String(offerPrice).match(/(\d+(?:[.,]\d{1,2})?)/);
             if (priceMatch) {
                 offerValue = parseFloat(priceMatch[0].replace(',', '.'));
+                console.log("Negotiate API: Parsed value", offerValue);
+            } else {
+                console.log("Negotiate API: Regex failed to match");
             }
         }
 
@@ -351,7 +355,17 @@ export async function action({ request }) {
             discountAmount = Math.round(discountAmount * 100) / 100; // Fix precision
 
             // --- VIP MODE: DRAFT ORDER ---
+            // --- VIP MODE: DRAFT ORDER ---
             if (shop.fulfillmentMode === 'DRAFT_ORDER') {
+
+                // 1. Require Email for Draft Order
+                if (!customerEmail) {
+                    return {
+                        status: "REQUEST_EMAIL",
+                        message: "Offre acceptée ! Pour valider la réservation, veuillez entrer votre email." // TODO: Add translation key
+                    };
+                }
+
                 console.log("Negotiate API: Creating Draft Order (VIP Mode)");
 
                 const draftOrder = await ShopifyService.createDraftOrder(
@@ -362,8 +376,9 @@ export async function action({ request }) {
                     customerEmail
                 );
 
-                if (!draftOrder) {
-                    return { status: "ERROR", error: "Échec de la réservation. Veuillez réessayer." };
+                if (!draftOrder || draftOrder.error) {
+                    const debugInfo = draftOrder?.error || "Unknown Error";
+                    return { status: "ERROR", error: `Shopify Error: ${debugInfo}` };
                 }
 
                 await db.offer.create({

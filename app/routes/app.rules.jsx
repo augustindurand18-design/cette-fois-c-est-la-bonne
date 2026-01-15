@@ -267,20 +267,20 @@ export default function RulesPage() {
 
                     <Card>
                         <BlockStack gap="400">
-                            <Text as="h2" variant="headingMd">Finalisation & Sécurité (Contrôle Marchand)</Text>
+                            <Text as="h2" variant="headingMd">{t('rules.fulfillment_title')}</Text>
                             <Box>
                                 <InlineStack align="start" gap="800">
                                     <RadioButton
-                                        label="Paiement Immédiat (Standard)"
-                                        helpText="Le client paie immédiatement via un code promo."
+                                        label={t('rules.fulfillment_standard')}
+                                        helpText={t('rules.fulfillment_standard_help')}
                                         checked={fulfillmentMode === 'DISCOUNT_CODE'}
                                         id="modeStandard"
                                         name="fulfillmentMode"
                                         onChange={() => setFulfillmentMode('DISCOUNT_CODE')}
                                     />
                                     <RadioButton
-                                        label="Validation Manuelle (Recommandé > 1000€)"
-                                        helpText="Aucun paiement immédiat. Une commande brouillon est créée pour votre validation finale."
+                                        label={t('rules.fulfillment_draft')}
+                                        helpText={t('rules.fulfillment_draft_help')}
                                         checked={fulfillmentMode === 'DRAFT_ORDER'}
                                         id="modeDraft"
                                         name="fulfillmentMode"
@@ -300,9 +300,9 @@ export default function RulesPage() {
                             <Select
                                 label={t('rules.rounds_label')}
                                 options={[
-                                    { label: '1 (Offre unique)', value: '1' },
-                                    { label: '3 (Classique)', value: '3' },
-                                    { label: '5 (Longue négociation)', value: '5' },
+                                    { label: t('rules.rounds_options.one'), value: '1' },
+                                    { label: t('rules.rounds_options.three'), value: '3' },
+                                    { label: t('rules.rounds_options.five'), value: '5' },
                                 ]}
                                 onChange={(val) => setMaxRounds(val)}
                                 value={maxRounds}
@@ -312,9 +312,9 @@ export default function RulesPage() {
                             <Select
                                 label={t('rules.strategy_label')}
                                 options={[
-                                    { label: 'Conciliant (Lâche prise rapidement)', value: 'conciliatory' },
-                                    { label: 'Modéré (Équilibré)', value: 'moderate' },
-                                    { label: 'Ferme (Lâche prise difficilement)', value: 'aggressive' },
+                                    { label: t('rules.strategies.conciliatory'), value: 'conciliatory' },
+                                    { label: t('rules.strategies.moderate'), value: 'moderate' },
+                                    { label: t('rules.strategies.aggressive'), value: 'aggressive' },
                                 ]}
                                 onChange={(val) => setStrategy(val)}
                                 value={strategy}
@@ -336,10 +336,10 @@ export default function RulesPage() {
                             />
 
                             <Checkbox
-                                label="Activer le déclencheur d'inactivité"
+                                label={t('rules.inactivity_label')}
                                 checked={enableInactivityTrigger}
                                 onChange={(val) => setEnableInactivityTrigger(val)}
-                                helpText="Ouvre le chat automatiquement après 20 s d'inactivité."
+                                helpText={t('rules.inactivity_help')}
                             />
                         </BlockStack>
                     </Card>
@@ -350,12 +350,12 @@ export default function RulesPage() {
                             <Select
                                 label={t('rules.rounding_label')}
                                 options={[
-                                    { label: '.85 (Psychologique)', value: '0.85' },
-                                    { label: '.99 (Classique)', value: '0.99' },
+                                    { label: t('rules.rounding_options.psychological'), value: '0.85' },
+                                    { label: t('rules.rounding_options.classic'), value: '0.99' },
                                     { label: '.95', value: '0.95' },
                                     { label: '.90', value: '0.90' },
                                     { label: '.50', value: '0.50' },
-                                    { label: '.00 (Rond)', value: '0.00' },
+                                    { label: t('rules.rounding_options.round'), value: '0.00' },
                                 ]}
                                 onChange={setRounding}
                                 value={rounding}

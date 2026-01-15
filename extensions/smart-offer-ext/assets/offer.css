@@ -113,6 +113,22 @@
     padding-bottom: 8px;
     /* Minimal padding */
   }
+
+  /* Hide branding to save space on mobile keyboard */
+  .smart-offer-chat-container.keyboard-open .smart-offer-branding {
+    display: none !important;
+  }
+
+  /* Compact header */
+  .smart-offer-chat-container.keyboard-open .smart-offer-header {
+    padding: 10px 16px;
+    min-height: 44px;
+  }
+
+  /* Adjust messages area */
+  .smart-offer-chat-container.keyboard-open .smart-offer-messages {
+    padding-bottom: 4px;
+  }
 }
 
 .smart-offer-header {

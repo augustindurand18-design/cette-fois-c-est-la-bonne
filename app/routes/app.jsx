@@ -13,6 +13,9 @@ import db from "../db.server";
 export const loader = async ({ request }) => {
   const { billing, session } = await authenticate.admin(request);
 
+  // DEBUG: Check if we actually have the draft_order scope
+  console.log("APP LOADER: Current Scopes", session.scope);
+
   // SELF-HEALING: Sync Access Token from Session to DB
   // This ensures that even after a DB reset, the token is restored when Admin is opened.
   try {
