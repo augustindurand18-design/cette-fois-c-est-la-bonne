@@ -131,6 +131,20 @@ export async function action({ request }) {
             return { status: "ERROR", error: "Le jeton d'accès est manquant. Veuillez réinstaller l'application." };
         }
 
+        // --- DEBUG SCOPE CHECK ---
+        try {
+            const scopeParams = {
+                method: "GET",
+                headers: { "X-Shopify-Access-Token": shop.accessToken }
+            };
+            const scopeRes = await fetch(`https://${shop.shopUrl}/admin/oauth/access_scopes.json`, scopeParams);
+            const scopeJson = await scopeRes.json();
+            console.log("Negotiate API: TOKEN REAL SCOPES:", JSON.stringify(scopeJson));
+        } catch (e) {
+            console.error("Negotiate API: Scope Check Failed", e);
+        }
+        // -------------------------
+
         // Initialize Translator with Shop Settings and Client Locale
         const clientLocale = body.locale || 'en';
 
