@@ -356,10 +356,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Ghost bubble for alignment
         const bubble = document.createElement("div");
-        bubble.className = "smart-offer-message-bubble bot";
+        bubble.className = "smart-offer-message-bubble bot action-wrapper"; // Added identifier class
         bubble.style.background = "transparent";
         bubble.style.boxShadow = "none";
         bubble.style.padding = "0";
+        bubble.style.border = "none"; // Ensure border is also inline-removed (though CSS !important might be needed)
 
         const btn = document.createElement("button");
         btn.className = "smart-offer-action-btn";
@@ -511,23 +512,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 5. Mobile & Viewport Handling
     const handleVisualViewport = () => {
-        if (!window.visualViewport || window.innerWidth > 480) return;
+        if (!window.visualViewport) return;
 
         const onResize = () => {
+            // Only active on mobile
+            if (window.innerWidth > 767) return;
             if (!State.isOpen) return;
+
             const vv = window.visualViewport;
-            const style = UI.chatContainer.style;
+            const container = UI.chatContainer;
 
-            // Sync with viewport
-            style.height = `${vv.height}px`;
-            style.top = `${vv.offsetTop}px`;
+            // Calculate height of layout viewport hidden by keyboard
+            // Note: On some browsers, window.innerHeight changes, on others it doesn't.
+            // Using visualViewport approach is most robust for 'fixed' elements.
 
-            // Adjust padding for keyboard
-            if (vv.height < window.innerHeight * 0.85) {
-                UI.chatContainer.classList.add('keyboard-open');
-            } else {
-                UI.chatContainer.classList.remove('keyboard-open');
-            }
+            // Logic: Stick to bottom of visual viewport
+            // We calculate the bottom offset relative to layout viewport
+            const offsetBottom = window.innerHeight - vv.height - vv.offsetTop;
+
+            // Apply correction
+            // We add a small margin (10px) to stay above keyboard
+            const bottomPos = Math.max(10, offsetBottom + 10);
+
+            container.style.bottom = `${bottomPos}px`;
+
+            // Also constrain max-height to fit in visual viewport if needed
+            // (CSS max-height: 90dvh handles most, but keyboard shrinks avail space)
+            container.style.maxHeight = `${vv.height - 20}px`;
+
             scrollToBottom();
         };
 
@@ -535,6 +547,7 @@ document.addEventListener('DOMContentLoaded', function () {
         window.visualViewport.addEventListener('scroll', onResize);
         onResize(); // Initial call
     };
+
 
     // --- Event Listeners ---
     UI.btn.onclick = openChat;
