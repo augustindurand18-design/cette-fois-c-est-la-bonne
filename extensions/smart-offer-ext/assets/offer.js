@@ -58,12 +58,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 // Apply Styles
                 const header = document.querySelector(".smart-offer-header");
-                // Only apply custom color if theme is NOT modern (modern uses glassmorphism)
+                const title = document.querySelector(".smart-offer-title");
+                const closeBtn = document.querySelector(".smart-offer-close");
+
+                // Only apply custom color if theme is NOT modern (modern uses glassmorphism/transparent)
                 if (header && data.chatTheme !== 'modern') {
                     header.style.backgroundColor = appSettings.widgetColor;
+                    // For non-modern themes with colored headers, force white text/icon for contrast
+                    if (title) title.style.color = "#ffffff";
+                    if (closeBtn) closeBtn.style.color = "#ffffff";
                 } else if (header && data.chatTheme === 'modern') {
                     // Ensure it's clear for modern
                     header.style.removeProperty('background-color');
+                    if (title) title.style.removeProperty('color'); // Reset to CSS default (black)
+                    if (closeBtn) closeBtn.style.removeProperty('color');
                 }
 
                 // Branding / Watermark Logic
@@ -303,6 +311,13 @@ document.addEventListener('DOMContentLoaded', function () {
         bubble.className = `smart-offer-message-bubble ${sender}`;
         if (isHtml) bubble.innerHTML = text;
         else bubble.innerText = text;
+
+        // Apply Custom Branding Color for User messages
+        if (sender === 'user' && appSettings.widgetColor) {
+            bubble.style.backgroundColor = appSettings.widgetColor;
+            bubble.style.color = "#ffffff"; // Force white text for contrast
+            // Note: Border radius is handled by CSS classes for theme
+        }
 
         msgDiv.appendChild(bubble);
         UI.messagesContainer.appendChild(msgDiv);

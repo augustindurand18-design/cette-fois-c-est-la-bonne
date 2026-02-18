@@ -23,11 +23,13 @@
   bottom: 20px;
   right: 20px;
   width: 400px;
+  /* Preview has max-width 320px but that's for preview context. 400px is fine for live. */
   height: 600px;
   max-height: 80vh;
   /* Don't get too tall on short screens */
   background-color: #fff;
-  border-radius: 16px;
+  border-radius: 12px;
+  /* MATCH PREVIEW */
   box-shadow: 0 5px 40px rgba(0, 0, 0, 0.16);
   display: flex;
   flex-direction: column;
@@ -52,7 +54,8 @@
 /* Header */
 .smart-offer-header {
   background-color: #fff;
-  padding: 16px 20px;
+  padding: 12px 16px;
+  /* MATCH PREVIEW */
   border-bottom: 1px solid #f1f1f1;
   display: flex;
   justify-content: space-between;
@@ -164,24 +167,30 @@
 .smart-offer-message-bubble {
   max-width: 80%;
   padding: 10px 14px;
+  /* MATCH PREVIEW */
   border-radius: 18px;
+  /* MATCH PREVIEW */
   font-size: 14px;
   line-height: 1.4;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .smart-offer-message-bubble.bot {
-  background-color: #fff;
-  color: #1c1c1e;
+  background-color: #f1f1f1;
+  /* MATCH PREVIEW DEFAULT */
+  color: #000;
   border-bottom-left-radius: 4px;
-  border: 1px solid #e1e1e1;
+  /* MATCH PREVIEW */
+  border: none;
+  /* Preview doesn't show border */
 }
 
 .smart-offer-message-bubble.user {
   background-color: #007aff;
-  /* Fallback color */
+  /* Default, overridden by JS */
   color: white;
   border-bottom-right-radius: 4px;
+  /* MATCH PREVIEW */
 }
 
 /* Action Wrapper (Ghost Bubble) overrides */
@@ -270,6 +279,76 @@
 
 #smart-offer-submit:hover {
   transform: scale(1.05);
+}
+
+/* --- Themes --- */
+
+/* Modern (Default) - MATCH PREVIEW EXACTLY */
+.smart-offer-chat-container.theme-modern {
+  background-color: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(35px) saturate(200%);
+  -webkit-backdrop-filter: blur(35px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset,
+    0 0 20px rgba(0, 122, 255, 0.15);
+  /* Blue Neon Aura */
+  border-radius: 16px;
+  /* Preview has radius variable but defaults to this */
+}
+
+.theme-modern .smart-offer-message-bubble {
+  border-radius: 24px;
+}
+
+.theme-modern .smart-offer-message-bubble.bot {
+  border-bottom-left-radius: 4px;
+}
+
+.theme-modern .smart-offer-message-bubble.user {
+  border-bottom-right-radius: 4px;
+}
+
+.theme-modern .smart-offer-header {
+  background-color: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Playful - MATCH PREVIEW EXACTLY */
+.smart-offer-chat-container.theme-playful {
+  border: 2px solid #000 !important;
+  box-shadow: 4px 4px 0px rgba(0, 0, 0, 1) !important;
+  border-radius: 12px !important;
+}
+
+.theme-playful .smart-offer-header {
+  border-bottom: 2px solid #000 !important;
+  /* font-weight: 800; // Font weight handled by .smart-offer-title, but we can enforce it */
+}
+
+/* Force Boldness in Playful Header */
+.theme-playful .smart-offer-title {
+  font-weight: 800 !important;
+}
+
+.theme-playful .smart-offer-close {
+  font-weight: 800 !important;
+  color: #fff !important;
+  /* Ensure it stands out if bg is dark, logic handles this but CSS backup good */
+}
+
+/* Classic - MATCH PREVIEW EXACTLY */
+.smart-offer-chat-container.theme-classic {
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  border: 1px solid #ccc;
+  /* Preview has border? Let's check code. Preview has border: 1px solid #e1e3e5 on container base */
+}
+
+.theme-classic .smart-offer-header {
+  border-bottom: none !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
 }
 
 /* Action Button (Add to Cart / Counter Offer) */
