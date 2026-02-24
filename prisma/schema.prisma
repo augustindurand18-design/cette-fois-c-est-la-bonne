@@ -85,6 +85,8 @@ model Rule {
   productId      String?  // If defined, overrides collection/global
   minDiscount    Float    // e.g., 0.80 for 20% off max
   minPrice       Float?   // Specific minimum accepted price override
+  inputPrice     String?   // Store the raw input string for better UX (optional, but good for "12.")
+  requiresManualValidation Boolean @default(false) // NEW: VIP/Security Toggle per product
   isEnabled      Boolean  @default(true)
   createdAt      DateTime @default(now())
   

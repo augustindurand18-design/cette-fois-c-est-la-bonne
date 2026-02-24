@@ -16,15 +16,23 @@ export async function loader({ request }) {
     const collectionIds = url.searchParams.get("collectionIds")?.split(",") || [];
 
     if (!shopUrl) {
+        console.error("[Negotiate API] Missing shop param");
         return new Response(JSON.stringify({ error: "Missing shop param" }), {
             status: 400,
             headers: { "Content-Type": "application/json" }
         });
     }
 
-    const shop = await db.shop.findUnique({ where: { shopUrl } });
+    let shop;
+    try {
+        shop = await db.shop.findUnique({ where: { shopUrl } });
+    } catch (e) {
+        console.error("[Negotiate API] DB Error finding shop:", e);
+        return new Response(JSON.stringify({ error: "DB Error" }), { status: 500 });
+    }
 
     if (!shop) {
+        console.error("[Negotiate API] Shop not found for URL:", shopUrl);
         return new Response(JSON.stringify({ error: "Shop not found" }), {
             status: 404,
             headers: { "Content-Type": "application/json" }
@@ -369,8 +377,11 @@ export async function action({ request }) {
             discountAmount = Math.round(discountAmount * 100) / 100; // Fix precision
 
             // --- VIP MODE: DRAFT ORDER ---
-            // --- VIP MODE: DRAFT ORDER ---
-            if (shop.fulfillmentMode === 'DRAFT_ORDER') {
+            // Checked against the specific rule for this product
+            // OLD: if (shop.fulfillmentMode === 'DRAFT_ORDER')
+            const requiresManualValidation = rule?.requiresManualValidation === true;
+
+            if (requiresManualValidation) {
 
                 // 1. Require Email for Draft Order
                 if (!customerEmail) {
@@ -380,7 +391,7 @@ export async function action({ request }) {
                     };
                 }
 
-                console.log("Negotiate API: Creating Draft Order (VIP Mode)");
+                console.log("Negotiate API: Creating Draft Order (Manual Validation Rule Active)");
 
                 const draftOrder = await ShopifyService.createDraftOrder(
                     shop.shopUrl,

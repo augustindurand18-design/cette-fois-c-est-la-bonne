@@ -49,7 +49,6 @@ export const loader = async ({ request }) => {
         allowSaleItems: shop.allowSaleItems,
         enableExitIntent: shop.enableExitIntent,
         enableInactivityTrigger: shop.enableInactivityTrigger,
-        fulfillmentMode: shop.fulfillmentMode || "DISCOUNT_CODE",
         autoNegotiation: shop.autoNegotiation !== false,
         autoValidityDuration: shop.autoValidityDuration || 24,
         manualValidityDuration: shop.manualValidityDuration || 72,
@@ -95,7 +94,7 @@ export const action = async ({ request }) => {
                 enableExitIntent,
                 enableInactivityTrigger,
                 autoNegotiation: formData.get("autoNegotiation") === "true",
-                fulfillmentMode: formData.get("fulfillmentMode"), // New Field
+                // fulfillmentMode removed - moved to per-product rule
                 autoValidityDuration: !isNaN(autoValidityDuration) ? autoValidityDuration : 24,
                 manualValidityDuration: !isNaN(manualValidityDuration) ? manualValidityDuration : 72
             },
@@ -119,7 +118,7 @@ export default function RulesPage() {
     const [allowSaleItems, setAllowSaleItems] = useState(loaderData.allowSaleItems);
     const [enableExitIntent, setEnableExitIntent] = useState(loaderData.enableExitIntent);
     const [enableInactivityTrigger, setEnableInactivityTrigger] = useState(loaderData.enableInactivityTrigger);
-    const [fulfillmentMode, setFulfillmentMode] = useState(loaderData.fulfillmentMode || "DISCOUNT_CODE");
+    // fulfillmentMode state removed
     const [autoNegotiation, setAutoNegotiation] = useState(loaderData.autoNegotiation);
     const [autoValidity, setAutoValidity] = useState(loaderData.autoValidityDuration ? loaderData.autoValidityDuration.toString() : "24");
     const [manualValidity, setManualValidity] = useState(loaderData.manualValidityDuration ? loaderData.manualValidityDuration.toString() : "72");
@@ -138,13 +137,13 @@ export default function RulesPage() {
             s(allowSaleItems) !== s(loaderData.allowSaleItems) ||
             s(enableExitIntent) !== s(loaderData.enableExitIntent) ||
             s(enableInactivityTrigger) !== s(loaderData.enableInactivityTrigger) ||
-            s(fulfillmentMode) !== s(loaderData.fulfillmentMode || "DISCOUNT_CODE") ||
+            /* s(fulfillmentMode) check removed */
             s(autoNegotiation) !== s(loaderData.autoNegotiation) ||
             s(autoValidity) !== s(loaderData.autoValidityDuration || 24) ||
             s(manualValidity) !== s(loaderData.manualValidityDuration || 72);
 
         setIsDirty(isModified);
-    }, [rounding, isActive, maxRounds, strategy, allowSaleItems, enableExitIntent, enableInactivityTrigger, fulfillmentMode, autoNegotiation, autoValidity, manualValidity, loaderData]);
+    }, [rounding, isActive, maxRounds, strategy, allowSaleItems, enableExitIntent, enableInactivityTrigger, /* fulfillmentMode removed */ autoNegotiation, autoValidity, manualValidity, loaderData]);
 
     const handleSave = () => {
         fetcher.submit({
@@ -156,7 +155,7 @@ export default function RulesPage() {
             allowSaleItems: allowSaleItems.toString(),
             enableExitIntent: enableExitIntent.toString(),
             enableInactivityTrigger: enableInactivityTrigger.toString(),
-            fulfillmentMode: fulfillmentMode,
+            /* fulfillmentMode removed */
             autoNegotiation: autoNegotiation.toString(),
             autoValidityDuration: autoValidity,
             manualValidityDuration: manualValidity
@@ -265,31 +264,9 @@ export default function RulesPage() {
                         </BlockStack>
                     </Card>
 
-                    <Card>
-                        <BlockStack gap="400">
-                            <Text as="h2" variant="headingMd">{t('rules.fulfillment_title')}</Text>
-                            <Box>
-                                <InlineStack align="start" gap="800">
-                                    <RadioButton
-                                        label={t('rules.fulfillment_standard')}
-                                        helpText={t('rules.fulfillment_standard_help')}
-                                        checked={fulfillmentMode === 'DISCOUNT_CODE'}
-                                        id="modeStandard"
-                                        name="fulfillmentMode"
-                                        onChange={() => setFulfillmentMode('DISCOUNT_CODE')}
-                                    />
-                                    <RadioButton
-                                        label={t('rules.fulfillment_draft')}
-                                        helpText={t('rules.fulfillment_draft_help')}
-                                        checked={fulfillmentMode === 'DRAFT_ORDER'}
-                                        id="modeDraft"
-                                        name="fulfillmentMode"
-                                        onChange={() => setFulfillmentMode('DRAFT_ORDER')}
-                                    />
-                                </InlineStack>
-                            </Box>
-                        </BlockStack>
-                    </Card>
+                    {/* Fulfillment Card Removed - Now Per Product */}
+
+
 
                     <Card>
                         <BlockStack gap="400">

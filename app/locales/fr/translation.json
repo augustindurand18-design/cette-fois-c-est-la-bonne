@@ -188,7 +188,10 @@
         "max_discount": "Rabais Max",
         "min_accepted_price": "Prix Minimum Accepté",
         "base_price": "Prix de base",
-        "modify_rule": "Modifier la règle pour"
+        "modify_rule": "Modifier la règle pour",
+        "security_label": "Mode de Validation",
+        "manual_validation": "Manuel",
+        "auto_validation": "Auto"
     },
     "parameters": {
         "email_settings": "Configuration Email (Gmail)",

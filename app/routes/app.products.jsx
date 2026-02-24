@@ -11,6 +11,7 @@ import {
     Avatar,
     ResourceItem,
     InlineStack,
+    Select,
     RangeSlider,
     TextField,
     Badge,
@@ -18,6 +19,7 @@ import {
     Toast,
     Icon,
     Thumbnail,
+    Checkbox,
 } from "@shopify/polaris";
 import { ImageIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
@@ -149,7 +151,7 @@ export const action = async ({ request }) => {
     const { session } = await authenticate.admin(request);
     const formData = await request.formData();
     const actionType = formData.get("actionType");
-    const shop = await db.shop.findUnique({ where: { shopUrl: session.shop } });
+    let shop = await db.shop.findUnique({ where: { shopUrl: session.shop } });
 
     if (actionType === "saveRules") {
         const updates = {};
@@ -168,6 +170,8 @@ export const action = async ({ request }) => {
                         updates[ruleId].minDiscount = parseFloat(value);
                     } else if (field === "minPrice") {
                         updates[ruleId].minPrice = value === "" ? null : parseFloat(value);
+                    } else if (field === "manual") {
+                        updates[ruleId].requiresManualValidation = value === "true";
                     }
                 }
             }
@@ -175,13 +179,19 @@ export const action = async ({ request }) => {
 
         // Execute updates
         for (const [ruleId, data] of Object.entries(updates)) {
-            await db.rule.update({
-                where: { id: ruleId },
-                data: {
-                    minDiscount: data.minDiscount,
-                    minPrice: data.minPrice
-                }
-            });
+            try {
+                await db.rule.update({
+                    where: { id: ruleId },
+                    data: {
+                        minDiscount: data.minDiscount,
+                        minPrice: data.minPrice,
+                        requiresManualValidation: data.requiresManualValidation
+                    }
+                });
+            } catch (e) {
+                console.warn(`[ACTION] Failed to update rule ${ruleId}:`, e.message);
+                // Continue to next rule instead of crashing
+            }
         }
         return { success: true };
     }
@@ -303,6 +313,15 @@ export default function ProductsPage() {
         return initial;
     });
 
+    // Specific Rules State: Manual Validation (Boolean)
+    const [specificManualValues, setSpecificManualValues] = useState(() => {
+        const initial = {};
+        loaderData.rules.forEach(r => {
+            initial[r.id] = r.requiresManualValidation === true;
+        });
+        return initial;
+    });
+
     const handleSpecificSliderChange = (ruleId, value, originalPrice) => {
         setSpecificRuleValues(prev => ({
             ...prev,
@@ -349,23 +368,34 @@ export default function ProductsPage() {
         setSpecificRuleValues(prev => ({ ...prev, [ruleId]: discountPercent }));
     };
 
+    const handleManualValidationToggle = (ruleId, newValue) => {
+        setSpecificManualValues(prev => ({
+            ...prev,
+            [ruleId]: newValue
+        }));
+    };
+
     // Dirty State Tracking
     const [isDirty, setIsDirty] = useState(false);
 
     // Initial Values for Reset
     const [initialRuleValues, setInitialRuleValues] = useState({});
     const [initialPriceValues, setInitialPriceValues] = useState({});
+    const [initialManualValues, setInitialManualValues] = useState({});
 
     useEffect(() => {
         // Initialize or Re-initialize when loaderData changes (e.g. after save)
         const initRules = {};
         const initPrices = {};
+        const initManual = {};
         loaderData.rules.forEach(r => {
             initRules[r.id] = Math.round((1 - r.minDiscount) * 100);
             initPrices[r.id] = r.minPrice !== null && r.minPrice !== undefined ? r.minPrice : null;
+            initManual[r.id] = r.requiresManualValidation === true;
         });
         setInitialRuleValues(initRules);
         setInitialPriceValues(initPrices);
+        setInitialManualValues(initManual);
         setIsDirty(false); // Reset dirty state on load/refresh
     }, [loaderData.rules]);
 
@@ -399,12 +429,22 @@ export default function ProductsPage() {
                 }
             }
         }
+        // Compare manual validation
+        if (!dirty) {
+            for (const key in specificManualValues) {
+                if (specificManualValues[key] !== initialManualValues[key]) {
+                    dirty = true;
+                    break;
+                }
+            }
+        }
         setIsDirty(dirty);
-    }, [specificRuleValues, specificPriceValues, initialRuleValues, initialPriceValues]);
+    }, [specificRuleValues, specificPriceValues, specificManualValues, initialRuleValues, initialPriceValues, initialManualValues]);
 
     const handleDiscard = () => {
         setSpecificRuleValues(initialRuleValues);
         setSpecificPriceValues(initialPriceValues);
+        setSpecificManualValues(initialManualValues);
         setIsDirty(false);
     };
 
@@ -416,6 +456,9 @@ export default function ProductsPage() {
 
             const priceVal = specificPriceValues[ruleId];
             data[`rule_${ruleId}_minPrice`] = (priceVal !== null && priceVal !== undefined) ? priceVal.toString() : "";
+
+            const manualVal = specificManualValues[ruleId];
+            data[`rule_${ruleId}_manual`] = manualVal.toString();
         });
         fetcher.submit(data, { method: "POST" });
         // Optimistically reset dirty logic or wait for loader re-validation (useEffect handles it)
@@ -619,6 +662,34 @@ export default function ProductsPage() {
                                                                     />
                                                                 </div>
                                                             )}
+
+                                                            <div style={{ minWidth: '200px' }}>
+                                                                <Text variant="bodyMd" as="p" style={{ marginBottom: '4px' }}>
+                                                                    {t('products.security_label')}
+                                                                </Text>
+                                                                <InlineStack gap="0">
+                                                                    <div style={{ borderTopLeftRadius: '4px', borderBottomLeftRadius: '4px', overflow: 'hidden' }}>
+                                                                        <Button
+                                                                            variant={specificManualValues[item.id] === false ? "primary" : "tertiary"}
+                                                                            onClick={() => handleManualValidationToggle(item.id, false)}
+                                                                            disabled={!isEnabled}
+                                                                            size="slim"
+                                                                        >
+                                                                            {t('products.auto_validation')}
+                                                                        </Button>
+                                                                    </div>
+                                                                    <div style={{ borderTopRightRadius: '4px', borderBottomRightRadius: '4px', overflow: 'hidden', marginLeft: '-1px' }}>
+                                                                        <Button
+                                                                            variant={specificManualValues[item.id] === true ? "primary" : "tertiary"}
+                                                                            onClick={() => handleManualValidationToggle(item.id, true)}
+                                                                            disabled={!isEnabled}
+                                                                            size="slim"
+                                                                        >
+                                                                            {t('products.manual_validation')}
+                                                                        </Button>
+                                                                    </div>
+                                                                </InlineStack>
+                                                            </div>
                                                         </div>
                                                     </BlockStack>
                                                 </ResourceItem>
