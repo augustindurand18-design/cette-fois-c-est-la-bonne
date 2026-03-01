@@ -136,7 +136,7 @@ export async function action({ request }) {
 
         if (!shop.accessToken) {
             console.error("Negotiate API: Missing Access Token for shop", shop.shopUrl);
-            return { status: "ERROR", error: "Le jeton d'accès est manquant. Veuillez réinstaller l'application." };
+            return { status: "ERROR", error: "Access token is missing. Please reinstall the app." };
         }
 
         // --- DEBUG SCOPE CHECK ---
@@ -244,7 +244,7 @@ export async function action({ request }) {
 
         if (!productData || productData.error) {
             console.error(`Negotiate API: Product data fetch failed for ${productId} on ${shop.shopUrl}`);
-            const errorMsg = productData?.error || "Impossible de récupérer les infos du produit.";
+            const errorMsg = productData?.error || "Could not retrieve product information.";
             return { status: "ERROR", error: errorMsg };
         }
 
@@ -387,7 +387,7 @@ export async function action({ request }) {
                 if (!customerEmail) {
                     return {
                         status: "REQUEST_EMAIL",
-                        message: "Offre acceptée ! Pour valider la réservation, veuillez entrer votre email." // TODO: Add translation key
+                        message: "Offer accepted! To validate your reservation, please enter your email." // TODO: Add translation key
                     };
                 }
 
@@ -426,7 +426,7 @@ export async function action({ request }) {
 
                 return {
                     status: "ACCEPTED_DRAFT",
-                    message: "Offre acceptée ! Une commande a été pré-réservée pour vous. Le vendeur va la valider et vous recevrez un lien de paiement par email sous peu."
+                    message: "Offer accepted! An order has been reserved for you. The seller will review it and you will receive a secure payment link shortly."
                 };
             }
 
@@ -447,7 +447,7 @@ export async function action({ request }) {
             );
 
             if (!createdCode) {
-                return { status: "ERROR", error: "Échec de la création de la remise. Veuillez réessayer." };
+                return { status: "ERROR", error: "Failed to create discount. Please try again." };
             }
 
             await db.offer.create({

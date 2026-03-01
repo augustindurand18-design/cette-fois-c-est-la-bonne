@@ -11,7 +11,7 @@ export const loader = async ({ request }) => {
     });
 
     if (!shop) {
-        return new Response("Boutique introuvable", { status: 404 });
+        return new Response("Shop not found", { status: 404 });
     }
 
     const offers = await db.offer.findMany({

@@ -183,7 +183,7 @@ export const ShopifyService = {
     const variables = {
       input: {
         email: email,
-        note: "Commande issue d'une négociation (À Valider)",
+        note: "Negotiated Order (Requires Validation)",
         tags: ["SmartOffer", "Negotiation_Draft"],
         lineItems: [
           {
@@ -192,7 +192,7 @@ export const ShopifyService = {
             appliedDiscount: {
               value: parseFloat(Math.abs(amount).toFixed(2)),
               valueType: "FIXED_AMOUNT",
-              title: "Remise Négociée"
+              title: "Negotiated Discount"
             }
           }
         ]
@@ -223,6 +223,110 @@ export const ShopifyService = {
       return json.data?.draftOrderCreate?.draftOrder;
     } catch (e) {
       console.error("ShopifyService: Error creating draft order", e);
+      return { error: e.message };
+    }
+  },
+
+  /**
+   * Send Invoice for a Draft Order
+   */
+  async sendDraftOrderInvoice(shopDomain, accessToken, draftOrderId) {
+    const query = `
+      mutation draftOrderInvoiceSend($id: ID!) {
+        draftOrderInvoiceSend(id: $id) {
+          draftOrder {
+            id
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const draftOrderGid = draftOrderId.includes("gid://") ? draftOrderId : `gid://shopify/DraftOrder/${draftOrderId}`;
+
+    const variables = {
+      id: draftOrderGid
+    };
+
+    try {
+      const response = await fetch(`https://${shopDomain}/admin/api/2025-10/graphql.json`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': accessToken
+        },
+        body: JSON.stringify({ query, variables })
+      });
+
+      const json = await response.json();
+
+      if (json.errors || json.data?.draftOrderInvoiceSend?.userErrors?.length > 0) {
+        const errorMessages = json.errors
+          ? json.errors.map(e => e.message).join(", ")
+          : json.data.draftOrderInvoiceSend.userErrors.map(e => e.message).join(", ");
+
+        console.error("ShopifyService: Send Invoice Error", errorMessages);
+        return { error: errorMessages };
+      }
+
+      return { success: true };
+    } catch (e) {
+      console.error("ShopifyService: Error sending invoice", e);
+      return { error: e.message };
+    }
+  },
+
+  /**
+   * Delete a Draft Order (when rejecting an offer)
+   */
+  async deleteDraftOrder(shopDomain, accessToken, draftOrderId) {
+    const query = `
+      mutation draftOrderDelete($input: DraftOrderDeleteInput!) {
+        draftOrderDelete(input: $input) {
+          deletedId
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const draftOrderGid = draftOrderId.includes("gid://") ? draftOrderId : `gid://shopify/DraftOrder/${draftOrderId}`;
+
+    const variables = {
+      input: {
+        id: draftOrderGid
+      }
+    };
+
+    try {
+      const response = await fetch(`https://${shopDomain}/admin/api/2025-10/graphql.json`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': accessToken
+        },
+        body: JSON.stringify({ query, variables })
+      });
+
+      const json = await response.json();
+
+      if (json.errors || json.data?.draftOrderDelete?.userErrors?.length > 0) {
+        const errorMessages = json.errors
+          ? json.errors.map(e => e.message).join(", ")
+          : json.data.draftOrderDelete.userErrors.map(e => e.message).join(", ");
+
+        console.error("ShopifyService: Delete Draft Order Error", errorMessages);
+        return { error: errorMessages };
+      }
+
+      return { success: true };
+    } catch (e) {
+      console.error("ShopifyService: Error deleting draft order", e);
       return { error: e.message };
     }
   },

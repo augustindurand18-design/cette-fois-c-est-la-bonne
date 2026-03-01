@@ -605,7 +605,7 @@ export default function CustomizationPage() {
                                                         value={widgetTitle}
                                                         onChange={setWidgetTitle}
                                                         autoComplete="off"
-                                                        helpText="Texte affiché en haut de la fenêtre (ex: Discuter avec nous)"
+                                                        helpText="Text displayed at the top of the window (e.g. Chat with us)"
                                                     />
                                                 </Box>
                                                 <Box paddingBlockEnd="400">

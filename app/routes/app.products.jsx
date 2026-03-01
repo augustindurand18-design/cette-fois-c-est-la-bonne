@@ -21,7 +21,7 @@ import {
     Thumbnail,
     Checkbox,
 } from "@shopify/polaris";
-import { ImageIcon } from "@shopify/polaris-icons";
+import { ImageIcon, LockIcon, AutomationIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { useEffect } from "react";
@@ -232,12 +232,12 @@ export const action = async ({ request }) => {
                 });
                 console.log("[ACTION] Created new shop:", shop.id);
             } catch (e) {
-                console.error("[ACTION] Failed to create shop:", e);
-                return { success: false, message: `Erreur création: ${e.message}` };
+                console.error("Error creating rule", e);
+                return { success: false, message: `Creation error: ${e.message}` };
             }
         }
 
-        if (!shop) return { success: false, message: "Impossible de récupérer la boutique" };
+        if (!shop) return { success: false, message: "Cannot retrieve shop" };
 
         const existing = await db.rule.findFirst({
             where: {
@@ -247,20 +247,25 @@ export const action = async ({ request }) => {
         });
 
         if (!existing) {
-            console.log("[ACTION] Creating new rule for shop ID:", shop.id);
-            const newRule = await db.rule.create({
-                data: {
-                    shopId: shop.id,
-                    [type === 'product' ? 'productId' : 'collectionId']: resourceId,
-                    minDiscount: 0.80, // Default to 20%
-                    isEnabled: true
-                }
-            });
-            console.log("[ACTION] Rule created ID:", newRule.id);
-            return { success: true, message: "Règle ajoutée avec succès" };
+            try {
+                console.log("[ACTION] Creating new rule for shop ID:", shop.id);
+                const newRule = await db.rule.create({
+                    data: {
+                        shopId: shop.id,
+                        [type === 'product' ? 'productId' : 'collectionId']: resourceId,
+                        minDiscount: 0.80, // Default to 20%
+                        isEnabled: true
+                    }
+                });
+                console.log("[ACTION] Rule created ID:", newRule.id);
+                return { success: true, message: "Rule added successfully" };
+            } catch (e) {
+                console.error("Error adding rule", e);
+                return { success: false, message: "This rule already exists or an error occurred" };
+            }
         } else {
             console.log("[ACTION] Rule already exists.");
-            return { success: false, message: "Cette règle existe déjà" };
+            return { success: false, message: "This rule already exists or an error occurred" };
         }
     }
 
@@ -467,7 +472,7 @@ export default function ProductsPage() {
     const handleAddProduct = async () => {
         console.log("Add Product Clicked. Window.shopify:", window.shopify);
         if (!window.shopify) {
-            setToastMessage("Erreur: Shopify App Bridge non chargé. Rafraîchissez la page.");
+            setToastMessage("Error: Shopify App Bridge not loaded. Please refresh the page.");
             setToastError(true);
             setToastActive(true);
             return;
@@ -663,32 +668,39 @@ export default function ProductsPage() {
                                                                 </div>
                                                             )}
 
-                                                            <div style={{ minWidth: '200px' }}>
-                                                                <Text variant="bodyMd" as="p" style={{ marginBottom: '4px' }}>
+                                                            <div
+                                                                style={{ minWidth: '240px' }}
+                                                                onClick={() => isEnabled && handleManualValidationToggle(item.id, !specificManualValues[item.id])}
+                                                            >
+                                                                <Text variant="bodyMd" as="p" style={{ marginBottom: '6px' }}>
                                                                     {t('products.security_label')}
                                                                 </Text>
-                                                                <InlineStack gap="0">
-                                                                    <div style={{ borderTopLeftRadius: '4px', borderBottomLeftRadius: '4px', overflow: 'hidden' }}>
-                                                                        <Button
-                                                                            variant={specificManualValues[item.id] === false ? "primary" : "tertiary"}
-                                                                            onClick={() => handleManualValidationToggle(item.id, false)}
-                                                                            disabled={!isEnabled}
-                                                                            size="slim"
-                                                                        >
-                                                                            {t('products.auto_validation')}
-                                                                        </Button>
+                                                                <div style={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    padding: '8px 12px',
+                                                                    backgroundColor: specificManualValues[item.id] ? 'var(--p-color-bg-surface-success)' : 'var(--p-color-bg-surface-secondary)',
+                                                                    border: `1px solid ${specificManualValues[item.id] ? 'var(--p-color-border-success)' : 'var(--p-color-border-subdued)'}`,
+                                                                    borderRadius: '8px',
+                                                                    cursor: isEnabled ? 'pointer' : 'not-allowed',
+                                                                    opacity: isEnabled ? 1 : 0.6,
+                                                                    transition: 'all 0.2s ease',
+                                                                }}>
+                                                                    <div style={{ marginRight: '12px', flexShrink: 0 }}>
+                                                                        <Icon
+                                                                            source={specificManualValues[item.id] ? LockIcon : AutomationIcon}
+                                                                            tone={specificManualValues[item.id] ? "success" : "base"}
+                                                                        />
                                                                     </div>
-                                                                    <div style={{ borderTopRightRadius: '4px', borderBottomRightRadius: '4px', overflow: 'hidden', marginLeft: '-1px' }}>
-                                                                        <Button
-                                                                            variant={specificManualValues[item.id] === true ? "primary" : "tertiary"}
-                                                                            onClick={() => handleManualValidationToggle(item.id, true)}
-                                                                            disabled={!isEnabled}
-                                                                            size="slim"
-                                                                        >
-                                                                            {t('products.manual_validation')}
-                                                                        </Button>
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                                        <Text variant="bodySm" fontWeight="bold">
+                                                                            {specificManualValues[item.id] ? "Manual Validation" : "Auto Validation"}
+                                                                        </Text>
+                                                                        <Text as="p" variant="bodySm" tone="subdued">
+                                                                            {specificManualValues[item.id] ? "Secure payment via draft order" : "Instant discount code"}
+                                                                        </Text>
                                                                     </div>
-                                                                </InlineStack>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </BlockStack>

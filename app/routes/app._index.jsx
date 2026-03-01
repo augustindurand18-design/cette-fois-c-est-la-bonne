@@ -79,29 +79,42 @@ export const loader = async ({ request }) => {
     createdAt: { gte: startDate, lte: endDate }
   };
 
-  // Calculate Stats
   const allOffersCount = await db.offer.count({ where: dateFilter });
 
+  // Separate true conversions from pending ones
   const acceptedOffers = await db.offer.findMany({
-    where: { ...dateFilter, status: "ACCEPTED" },
-    select: { offeredPrice: true, originalPrice: true, createdAt: true }
+    where: {
+      ...dateFilter,
+      status: { in: ["ACCEPTED", "ACCEPTED_DRAFT"] }
+    },
+    select: { offeredPrice: true, originalPrice: true, createdAt: true, isConverted: true }
   });
 
+  const convertedOffers = acceptedOffers.filter(o => o.isConverted);
+  const pendingOffers = acceptedOffers.filter(o => !o.isConverted);
+
   const acceptedCount = acceptedOffers.length;
+  const convertedCount = convertedOffers.length;
   const rejectedCount = await db.offer.count({ where: { ...dateFilter, status: "REJECTED" } });
 
-  let totalRevenue = 0;
+  let actualRevenue = 0;
+  let pendingRevenue = 0;
   let totalDiscountPercentage = 0;
 
-  acceptedOffers.forEach(offer => {
-    totalRevenue += offer.offeredPrice;
+  convertedOffers.forEach(offer => {
+    actualRevenue += offer.offeredPrice;
     if (offer.originalPrice && offer.originalPrice > 0) {
       totalDiscountPercentage += ((offer.originalPrice - offer.offeredPrice) / offer.originalPrice);
     }
   });
 
-  const avgDiscount = acceptedCount > 0 ? (totalDiscountPercentage / acceptedCount) * 100 : 0;
-  const acceptanceRate = allOffersCount > 0 ? (acceptedCount / allOffersCount) * 100 : 0;
+  pendingOffers.forEach(offer => {
+    pendingRevenue += offer.offeredPrice;
+  });
+
+  const avgDiscount = convertedCount > 0 ? (totalDiscountPercentage / convertedCount) * 100 : 0;
+  // Conversion rate is based on true sales, not just accepted offers
+  const conversionRate = allOffersCount > 0 ? (convertedCount / allOffersCount) * 100 : 0;
 
   const recentOffers = shop.offers.map(offer => ({
     id: offer.id,
@@ -109,6 +122,7 @@ export const loader = async ({ request }) => {
     originalPrice: offer.originalPrice,
     offerPrice: offer.offeredPrice,
     status: offer.status,
+    isConverted: offer.isConverted,
     createdAt: offer.createdAt,
   }));
 
@@ -127,7 +141,7 @@ export const loader = async ({ request }) => {
     const nextD = new Date(d);
     nextD.setDate(d.getDate() + 1);
 
-    const dayTotal = acceptedOffers
+    const dayTotal = convertedOffers
       .filter(o => {
         const oDate = new Date(o.createdAt);
         return oDate >= d && oDate < nextD;
@@ -141,10 +155,12 @@ export const loader = async ({ request }) => {
     stats: {
       total: allOffersCount,
       accepted: acceptedCount,
+      converted: convertedCount,
       rejected: rejectedCount,
-      revenue: totalRevenue,
+      revenue: actualRevenue,
+      pendingRevenue: pendingRevenue,
       avgDiscount: avgDiscount.toFixed(1),
-      acceptanceRate: acceptanceRate.toFixed(1),
+      conversionRate: conversionRate.toFixed(1),
       sparklineData
     },
     recentOffers,
@@ -228,37 +244,6 @@ export default function Index() {
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(recentOffers);
 
-  const rowMarkup = recentOffers.map(
-    ({ id, productTitle, originalPrice, offerPrice, status, createdAt }, index) => (
-      <IndexTable.Row
-        id={id}
-        key={id}
-        selected={selectedResources.includes(id)}
-        position={index}
-      >
-        <IndexTable.Cell>
-          <Text variant="bodyMd" fontWeight="bold">
-            {productTitle === "Produit inconnu" ? t('dashboard.unknown_product') : productTitle}
-          </Text>
-        </IndexTable.Cell>
-        <IndexTable.Cell>{new Date(createdAt).toLocaleDateString()} {new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</IndexTable.Cell>
-        <IndexTable.Cell>
-          <Text as="span" variant="bodyMd" decoration="lineThrough" tone="subdued">
-            {originalPrice}€
-          </Text>
-          <Text as="span" variant="bodyMd" fontWeight="bold">
-            {' '}→ {offerPrice}€
-          </Text>
-        </IndexTable.Cell>
-        <IndexTable.Cell>
-          <Badge tone={status === 'ACCEPTED' ? 'success' : status === 'REJECTED' ? 'critical' : 'attention'}>
-            {status}
-          </Badge>
-        </IndexTable.Cell>
-      </IndexTable.Row>
-    ),
-  );
-
   return (
     <Page
       title={t('dashboard.title')}
@@ -323,13 +308,13 @@ export default function Index() {
 
         {/* KPI Section */}
         <Layout.Section>
-          <InlineGrid columns={3} gap="400">
+          <InlineGrid columns={4} gap="400">
             <Card>
               <BlockStack gap="200">
-                <Text variant="headingSm" as="h3" tone="subdued">{t('dashboard.revenue_generated')}</Text>
+                <Text variant="headingSm" as="h3" tone="subdued">Generated Revenue (Sales)</Text>
                 <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                  <Text variant="headingLg" as="p">{stats.revenue.toFixed(2)} €</Text>
-                  <div style={{ width: '80px', height: '30px' }}>
+                  <Text variant="headingLg" as="p" tone="success">{stats.revenue.toFixed(2)} €</Text>
+                  <div style={{ width: '60px', height: '30px' }}>
                     <TinyChart data={stats.sparklineData} />
                   </div>
                 </div>
@@ -337,15 +322,23 @@ export default function Index() {
             </Card>
             <Card>
               <BlockStack gap="200">
-                <Text variant="headingSm" as="h3" tone="subdued">{t('dashboard.acceptance_rate')}</Text>
-                <Text variant="headingLg" as="p" tone="success">{stats.acceptanceRate}%</Text>
-                <Text variant="bodyXs" tone="subdued">{stats.total} {t('dashboard.total_offers_text')}</Text>
+                <Text variant="headingSm" as="h3" tone="subdued">Pending Potential</Text>
+                <Text variant="headingLg" as="p" tone="caution">{stats.pendingRevenue.toFixed(2)} €</Text>
+                <Text variant="bodyXs" tone="subdued">Unpaid codes or draft orders</Text>
+              </BlockStack>
+            </Card>
+            <Card>
+              <BlockStack gap="200">
+                <Text variant="headingSm" as="h3" tone="subdued">Conversion Rate</Text>
+                <Text variant="headingLg" as="p">{stats.conversionRate}%</Text>
+                <Text variant="bodyXs" tone="subdued">{stats.converted} sales / {stats.total} offers</Text>
               </BlockStack>
             </Card>
             <Card>
               <BlockStack gap="200">
                 <Text variant="headingSm" as="h3" tone="subdued">{t('dashboard.avg_discount')}</Text>
                 <Text variant="headingLg" as="p" tone="highlight">{stats.avgDiscount}%</Text>
+                <Text variant="bodyXs" tone="subdued">On {stats.converted} sales</Text>
               </BlockStack>
             </Card>
           </InlineGrid>
@@ -371,7 +364,52 @@ export default function Index() {
                 ]}
                 selectable={false}
               >
-                {rowMarkup}
+                {recentOffers.map(
+                  ({ id, productTitle, originalPrice, offerPrice, status, isConverted, createdAt }, index) => {
+                    let badgeTone = 'attention';
+                    let badgeLabel = status;
+
+                    if (isConverted) {
+                      badgeTone = 'success';
+                      badgeLabel = 'PAID';
+                    } else if (status === 'ACCEPTED' || status === 'ACCEPTED_DRAFT') {
+                      badgeTone = 'info'; // Blue for accepted but not yet paid
+                      badgeLabel = 'PENDING PAYMENT';
+                    } else if (status === 'REJECTED') {
+                      badgeTone = 'critical';
+                      badgeLabel = 'REJECTED';
+                    }
+
+                    return (
+                      <IndexTable.Row
+                        id={id}
+                        key={id}
+                        selected={selectedResources.includes(id)}
+                        position={index}
+                      >
+                        <IndexTable.Cell>
+                          <Text variant="bodyMd" fontWeight="bold">
+                            {productTitle === "Produit inconnu" ? t('dashboard.unknown_product') : productTitle}
+                          </Text>
+                        </IndexTable.Cell>
+                        <IndexTable.Cell>{new Date(createdAt).toLocaleDateString()} {new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</IndexTable.Cell>
+                        <IndexTable.Cell>
+                          <Text as="span" variant="bodyMd" decoration="lineThrough" tone="subdued">
+                            {originalPrice}€
+                          </Text>
+                          <Text as="span" variant="bodyMd" fontWeight="bold">
+                            {' '}→ {offerPrice}€
+                          </Text>
+                        </IndexTable.Cell>
+                        <IndexTable.Cell>
+                          <Badge tone={badgeTone}>
+                            {badgeLabel}
+                          </Badge>
+                        </IndexTable.Cell>
+                      </IndexTable.Row>
+                    )
+                  }
+                )}
               </IndexTable>
             ) : (
               <Box padding="400">

@@ -1,11 +1,11 @@
 {
-    "name": "Widget Offre Intelligente",
+    "name": "Smart Offer Widget",
     "settings": {
         "btn_color": {
-            "label": "Couleur du bouton"
+            "label": "Button Color"
         },
         "btn_text": {
-            "label": "Texte du bouton"
+            "label": "Button Text"
         }
     }
 }

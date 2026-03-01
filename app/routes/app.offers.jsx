@@ -38,7 +38,7 @@ export const loader = async ({ request }) => {
     const pendingOffersData = await db.offer.findMany({
         where: {
             shopId: shop.id,
-            status: "PENDING",
+            status: { in: ["PENDING", "ACCEPTED_DRAFT"] },
         },
         orderBy: { createdAt: "desc" },
     });
@@ -47,7 +47,7 @@ export const loader = async ({ request }) => {
     const historyOffersData = await db.offer.findMany({
         where: {
             shopId: shop.id,
-            status: { not: "PENDING" },
+            status: { notIn: ["PENDING", "ACCEPTED_DRAFT"] },
         },
         orderBy: { createdAt: "desc" },
         take: 50 // Limit history to last 50 for performance
@@ -355,6 +355,56 @@ export const action = async ({ request }) => {
         }
 
         return { success: false, error: "Failed to create counter discount." };
+
+    } else if (intent === "SEND_INVOICE") {
+        if (!offer.code || !offer.code.startsWith("DRAFT-")) {
+            return { success: false, error: "Not a valid draft offer." };
+        }
+
+        const draftOrderId = offer.code.replace("DRAFT-", "");
+
+        const result = await ShopifyService.sendDraftOrderInvoice(
+            shop.shopUrl,
+            shop.accessToken,
+            draftOrderId
+        );
+
+        if (result.success) {
+            await db.offer.update({
+                where: { id: offerId },
+                data: { status: "ACCEPTED" }
+            });
+
+            if (result.sendResult.userErrors && result.sendResult.userErrors.length > 0) {
+                return { success: false, error: result.sendResult.userErrors[0].message };
+            }
+
+            return { success: true, message: "Invoice sent to customer by Shopify." };
+        }
+
+        return { success: false, error: result.error || "Failed to send invoice." };
+
+    } else if (intent === "CANCEL_DRAFT") {
+        if (!offer.code || !offer.code.startsWith("DRAFT-")) {
+            return { success: false, error: "Not a valid draft offer." };
+        }
+
+        const draftOrderId = offer.code.replace("DRAFT-", "");
+
+        const result = await ShopifyService.deleteDraftOrder(
+            shop.shopUrl,
+            shop.accessToken,
+            draftOrderId
+        );
+
+        // We reject the offer in our DB even if Shopify deletion fails (in case it was already deleted)
+        await db.offer.update({
+            where: { id: offerId },
+            data: { status: "REJECTED" }
+        });
+
+        // Optional: Send a rejection email like standard rejection
+        return { success: true, message: "Reservation cancelled and rejected." };
     }
 
     return { success: false };
@@ -387,6 +437,8 @@ export default function OffersPage() {
 
     const handleAccept = (id) => fetcher.submit({ offerId: id, intent: "ACCEPT" }, { method: "POST" });
     const handleReject = (id) => fetcher.submit({ offerId: id, intent: "REJECT" }, { method: "POST" });
+    const handleSendInvoice = (id) => fetcher.submit({ offerId: id, intent: "SEND_INVOICE" }, { method: "POST" });
+    const handleCancelDraft = (id) => fetcher.submit({ offerId: id, intent: "CANCEL_DRAFT" }, { method: "POST" });
 
     const handleOpenCounter = (offer) => {
         setActiveOffer(offer);
@@ -416,16 +468,20 @@ export default function OffersPage() {
     }
 
     // Custom lightweight row component to guarantee instant rendering without ResourceList overhead
-    const OfferRow = ({ offer, isHistory, onAccept, onReject, onCounter, activeFetcherId }) => {
+    const OfferRow = ({ offer, isHistory, onAccept, onReject, onCounter, onSendInvoice, onCancelDraft, activeFetcherId }) => {
         const { t } = useTranslation();
         const { id, offeredPrice, originalPrice, productTitle, customerEmail, createdAt, imageUrl, status, counterPrice: itemCounterPrice } = offer;
         const date = new Date(createdAt).toLocaleDateString();
 
-        let badge = null;
-        if (status === "ACCEPTED") badge = <Badge tone="success">Acceptée</Badge>;
-        else if (status === "REJECTED") badge = <Badge tone="critical">Refusée</Badge>;
-        else if (status === "COUNTERED") badge = <Badge tone="warning">Contre-offre ({itemCounterPrice}€)</Badge>;
-        else if (status === "PENDING") badge = <Badge tone="attention">En attente</Badge>;
+        const getStatusBadge = (status) => {
+            let badge = null;
+            if (status === "ACCEPTED") badge = <Badge tone="success">Accepted</Badge>;
+            else if (status === "REJECTED") badge = <Badge tone="critical">Rejected</Badge>;
+            else if (status === "COUNTERED") badge = <Badge tone="info">Countered</Badge>;
+            else if (status === "PENDING") badge = <Badge tone="attention">Pending</Badge>;
+            else if (status === "ACCEPTED_DRAFT") badge = <Badge tone="info">To Validate (Draft)</Badge>;
+            return badge;
+        };
 
         return (
             <Box padding="400" borderBlockEndWidth="025" borderColor="border-subdued">
@@ -458,34 +514,55 @@ export default function OffersPage() {
                                     {originalPrice} €
                                 </Text>
                             </div>
-                            {badge}
+                            {getStatusBadge(status)}
                         </BlockStack>
                     </InlineStack>
 
-                    {/* Actions (Only for Pending) */}
+                    {/* Actions (Only for Pending / Drafts) */}
                     {!isHistory && (
                         <InlineStack gap="200" align="end">
-                            <Button
-                                onClick={() => onCounter(offer)}
-                            >
-                                {t('offers.counter')}
-                            </Button>
-                            <Button
-                                variant="primary"
-                                tone="critical"
-                                onClick={() => onReject(id)}
-                                loading={activeFetcherId === id + "-REJECT"}
-                            >
-                                {t('offers.reject')}
-                            </Button>
-                            <Button
-                                variant="primary"
-                                tone="success"
-                                onClick={() => onAccept(id)}
-                                loading={activeFetcherId === id + "-ACCEPT"}
-                            >
-                                {t('offers.accept')}
-                            </Button>
+                            {status === "ACCEPTED_DRAFT" ? (
+                                <>
+                                    <Button
+                                        variant="monochromePlain"
+                                        tone="critical"
+                                        onClick={() => onCancelDraft(id)}
+                                        loading={activeFetcherId === id + "-CANCEL_DRAFT"}
+                                    >
+                                        Reject Reservation
+                                    </Button>
+                                    <Button
+                                        variant="primary"
+                                        tone="success"
+                                        onClick={() => onSendInvoice(id)}
+                                        loading={activeFetcherId === id + "-SEND_INVOICE"}
+                                    >
+                                        Send Payment Link
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <Button onClick={() => onCounter(offer)}>
+                                        {t('offers.counter')}
+                                    </Button>
+                                    <Button
+                                        variant="primary"
+                                        tone="critical"
+                                        onClick={() => onReject(id)}
+                                        loading={activeFetcherId === id + "-REJECT"}
+                                    >
+                                        {t('offers.reject')}
+                                    </Button>
+                                    <Button
+                                        variant="primary"
+                                        tone="success"
+                                        onClick={() => onAccept(id)}
+                                        loading={activeFetcherId === id + "-ACCEPT"}
+                                    >
+                                        {t('offers.accept')}
+                                    </Button>
+                                </>
+                            )}
                         </InlineStack>
                     )}
                 </BlockStack>
@@ -494,7 +571,7 @@ export default function OffersPage() {
     };
 
     // Main List Container
-    const OffersListContainer = ({ offers, isHistory, onAccept, onReject, onCounter, fetcher }) => {
+    const OffersListContainer = ({ offers, isHistory, onAccept, onReject, onCounter, onSendInvoice, onCancelDraft, fetcher }) => {
         const { t } = useTranslation();
 
         if (!offers || offers.length === 0) {
@@ -504,7 +581,7 @@ export default function OffersPage() {
                         heading={t('offers.empty_heading')}
                         image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                     >
-                        <p>{isHistory ? "Aucune offre traitée pour le moment." : t('offers.empty_body')}</p>
+                        <p>{isHistory ? "No processed offers yet." : t('offers.empty_body')}</p>
                     </EmptyState>
                 </Box>
             );
@@ -520,6 +597,8 @@ export default function OffersPage() {
                         onAccept={onAccept}
                         onReject={onReject}
                         onCounter={onCounter}
+                        onSendInvoice={onSendInvoice}
+                        onCancelDraft={onCancelDraft}
                         activeFetcherId={fetcher.state === "submitting" ? fetcher.formData?.get("offerId") + "-" + fetcher.formData?.get("intent") : null}
                     />
                 ))}
@@ -560,6 +639,8 @@ export default function OffersPage() {
                                     onAccept={handleAccept}
                                     onReject={handleReject}
                                     onCounter={handleOpenCounter}
+                                    onSendInvoice={handleSendInvoice}
+                                    onCancelDraft={handleCancelDraft}
                                     fetcher={fetcher}
                                 />
                             </div>
@@ -570,6 +651,8 @@ export default function OffersPage() {
                                     onAccept={handleAccept}
                                     onReject={handleReject}
                                     onCounter={handleOpenCounter}
+                                    onSendInvoice={handleSendInvoice}
+                                    onCancelDraft={handleCancelDraft}
                                     fetcher={fetcher}
                                 />
                             </div>
