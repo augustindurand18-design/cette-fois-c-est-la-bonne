@@ -1,10 +1,10 @@
 import { useLoaderData, useSubmit } from "react-router";
-import { Page, Layout, Card, Text, Button, BlockStack, Box, InlineGrid, List, Badge, Divider, Icon, InlineStack } from "@shopify/polaris";
+import { Page, Layout, Card, Text, Button, BlockStack, Box, InlineGrid, List, Badge, Divider, Icon, InlineStack, ProgressBar } from "@shopify/polaris";
 import { CheckIcon, XIcon } from "@shopify/polaris-icons";
 import { authenticate, PLAN_STARTER, PLAN_GROWTH, PLAN_SCALE } from "../shopify.server";
 
 export async function loader({ request }) {
-    const { billing } = await authenticate.admin(request);
+    const { billing, admin } = await authenticate.admin(request);
 
     try {
         // Check active plans
@@ -27,7 +27,53 @@ export async function loader({ request }) {
         if (isScale) currentPlan = "Scale";
         else if (isGrowth) currentPlan = "Growth";
 
-        return { currentPlan };
+        // Fetch Subscription Usage Stats
+        let usageDetails = { isUsageCapped: false, usedAmount: 0, cappedAmount: 0, percentage: 0 };
+        try {
+            const subscriptions = await admin.graphql(
+                `#graphql
+                query {
+                    appInstallation {
+                        activeSubscriptions {
+                            name
+                            lineItems {
+                                plan {
+                                    pricingDetails {
+                                        ... on AppUsagePricing {
+                                            balanceUsed { amount }
+                                            cappedAmount { amount }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }`
+            );
+            const subData = await subscriptions.json();
+            const activeSubs = subData.data?.appInstallation?.activeSubscriptions || [];
+
+            if (activeSubs.length > 0) {
+                for (const sub of activeSubs) {
+                    for (const lineItem of sub.lineItems) {
+                        const pricing = lineItem.plan?.pricingDetails;
+                        if (pricing && pricing.balanceUsed) {
+                            usageDetails.isUsageCapped = true;
+                            usageDetails.usedAmount = parseFloat(pricing.balanceUsed.amount);
+                            usageDetails.cappedAmount = parseFloat(pricing.cappedAmount.amount);
+                            usageDetails.percentage = usageDetails.cappedAmount > 0
+                                ? (usageDetails.usedAmount / usageDetails.cappedAmount) * 100
+                                : 0;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Failed to fetch usage limits", error);
+        }
+
+        return { currentPlan, usageDetails };
     }
 }
 
@@ -57,7 +103,7 @@ export async function action({ request }) {
 }
 
 export default function Pricing() {
-    const { currentPlan } = useLoaderData();
+    const { currentPlan, usageDetails } = useLoaderData();
     const submit = useSubmit();
 
     const handleUpgrade = (plan) => {
@@ -106,13 +152,16 @@ export default function Pricing() {
                 </BlockStack>
                 <Box paddingBlockStart="200">
                     <Button
-                        variant={isCurrent ? "secondary" : "primary"}
-                        disabled={isCurrent}
+                        variant={isCurrent && (!usageDetails?.isUsageCapped || usageDetails.percentage < 80) ? "secondary" : "primary"}
+                        disabled={isCurrent && (!usageDetails?.isUsageCapped || usageDetails.percentage < 80)}
                         onClick={() => handleUpgrade(targetPlan)}
                         fullWidth
                         size="large"
+                        tone={isCurrent && usageDetails?.percentage >= 80 ? "critical" : undefined}
                     >
-                        {isCurrent ? "Active" : `Upgrade to ${title}`}
+                        {isCurrent
+                            ? (usageDetails?.percentage >= 80 ? `Renew Plan to Reset Limit` : "Active")
+                            : `Upgrade to ${title}`}
                     </Button>
                 </Box>
             </BlockStack>
@@ -122,6 +171,24 @@ export default function Pricing() {
     return (
         <Page title="Pricing Plans" backAction={{ content: "Home", url: "/app" }}>
             <Layout>
+                {usageDetails?.isUsageCapped && (
+                    <Layout.Section>
+                        <Card>
+                            <BlockStack gap="300">
+                                <Text variant="headingMd" as="h2">Monthly Billing Limit Progress</Text>
+                                <ProgressBar
+                                    progress={usageDetails.percentage}
+                                    tone={usageDetails.percentage >= 80 ? "critical" : "primary"}
+                                />
+                                <Text as="p">
+                                    You have used <strong>${usageDetails.usedAmount.toFixed(2)}</strong> of your <strong>${usageDetails.cappedAmount.toFixed(2)}</strong> monthly commission limit ({usageDetails.percentage.toFixed(0)}%).
+                                    {usageDetails.percentage >= 80 && " Please click 'Renew Plan' below to increase your limit and avoid service interruption."}
+                                </Text>
+                            </BlockStack>
+                        </Card>
+                    </Layout.Section>
+                )}
+
                 <Layout.Section>
                     <InlineGrid columns={{ xs: 1, sm: 1, md: 3 }} gap="400">
                         <PlanCard

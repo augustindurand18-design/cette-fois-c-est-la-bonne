@@ -1,4 +1,4 @@
-import { useLoaderData, useFetcher, useSubmit, useSearchParams } from "react-router";
+import { useLoaderData, useFetcher, useSubmit, useSearchParams, useNavigate } from "react-router";
 import {
   Page,
   Layout,
@@ -13,14 +13,15 @@ import {
   Select,
   TextField,
   InlineStack,
-  Button
+  Button,
+  Banner
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { useEffect, useState } from "react";
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const shopUrl = session.shop;
   const url = new URL(request.url);
 
@@ -151,6 +152,55 @@ export const loader = async ({ request }) => {
     sparklineData.push(dayTotal);
   }
 
+  // Fetch Subscription Usage Stats
+  let usageDetails = { isUsageCapped: false, usedAmount: 0, cappedAmount: 0, percentage: 0 };
+
+  if (admin) {
+    try {
+      const subscriptions = await admin.graphql(
+        `#graphql
+        query {
+          appInstallation {
+            activeSubscriptions {
+              name
+              lineItems {
+                plan {
+                  pricingDetails {
+                    ... on AppUsagePricing {
+                      balanceUsed { amount }
+                      cappedAmount { amount }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }`
+      );
+      const subData = await subscriptions.json();
+      const activeSubs = subData.data?.appInstallation?.activeSubscriptions || [];
+
+      if (activeSubs.length > 0) {
+        for (const sub of activeSubs) {
+          for (const lineItem of sub.lineItems) {
+            const pricing = lineItem.plan?.pricingDetails;
+            if (pricing && pricing.balanceUsed) {
+              usageDetails.isUsageCapped = true;
+              usageDetails.usedAmount = parseFloat(pricing.balanceUsed.amount);
+              usageDetails.cappedAmount = parseFloat(pricing.cappedAmount.amount);
+              usageDetails.percentage = usageDetails.cappedAmount > 0
+                ? (usageDetails.usedAmount / usageDetails.cappedAmount) * 100
+                : 0;
+              break;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch usage limits", e);
+    }
+  }
+
   return {
     stats: {
       total: allOffersCount,
@@ -164,7 +214,8 @@ export const loader = async ({ request }) => {
       sparklineData
     },
     recentOffers,
-    filter: { period, start: customStart, end: customEnd }
+    filter: { period, start: customStart, end: customEnd },
+    usageDetails
   };
 };
 
@@ -199,10 +250,11 @@ const TinyChart = ({ data, color = "#008060" }) => {
 };
 
 export default function Index() {
-  const { stats, recentOffers, filter } = useLoaderData();
+  const { stats, recentOffers, filter, usageDetails } = useLoaderData();
   const { t } = useTranslation();
   const fetcher = useFetcher();
   const submit = useSubmit();
+  const navigate = useNavigate();
 
   const [period, setPeriod] = useState(filter?.period || "last_7d");
   const [customStart, setCustomStart] = useState(filter?.start || "");
@@ -255,11 +307,30 @@ export default function Index() {
       secondaryActions={[
         {
           content: "Pricing Plans",
-          url: "/app/pricing",
+          onAction: () => navigate("/app/pricing"),
         }
       ]}
     >
       <Layout>
+        {/* Usage Limit Banner */}
+        {usageDetails?.isUsageCapped && usageDetails.percentage >= 80 && (
+          <Layout.Section>
+            <Banner
+              title={t('dashboard.limit_warning_title', 'Billing Limit Approaching')}
+              tone="warning"
+              action={{ content: t('dashboard.manage_limits', 'Manage Limits'), onAction: () => navigate('/app/pricing') }}
+            >
+              <p>
+                {t('dashboard.limit_warning_text', {
+                  used: usageDetails.usedAmount.toFixed(2),
+                  cap: usageDetails.cappedAmount.toFixed(2),
+                  percentage: usageDetails.percentage.toFixed(0)
+                }, `You have generated $${usageDetails.usedAmount.toFixed(2)} in commissions out of your $${usageDetails.cappedAmount.toFixed(2)} monthly spending limit (${usageDetails.percentage.toFixed(0)}%). Please renew your plan to prevent service interruption once the cap is reached.`)}
+              </p>
+            </Banner>
+          </Layout.Section>
+        )}
+
         {/* Filter Section */}
         <Layout.Section>
           <Card>
